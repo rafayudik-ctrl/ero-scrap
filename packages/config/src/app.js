@@ -1,0 +1,46 @@
+/** Central product rules. Keep operational limits in one place. */
+export const APP_CONFIG = Object.freeze({
+  stage: 3,
+  stageName: 'private-catalog-and-retention',
+  scan: Object.freeze({
+    intervalMinutes: 10,
+    maxListingPages: 2,
+    maxPostsPerPage: 80,
+    maxPostInspectionsPerRun: 160,
+    minimumRequestDelayMs: 1_500,
+    requestTimeoutMs: 15_000,
+    maxHtmlBytes: 2_500_000,
+  }),
+  media: Object.freeze({
+    maxDurationMs: 10 * 60 * 1000,
+    maxFileBytes: 4 * 1024 * 1024 * 1024,
+    thumbnailWidth: 320,
+    thumbnailFormat: 'webp',
+    thumbnailMaxBytes: 256 * 1024,
+    durationMatchToleranceMs: 2_000,
+  }),
+  retention: Object.freeze({
+    unopenedDays: 7,
+    afterFirstClickHours: 24,
+    sweepIntervalMinutes: 10,
+    batchSize: 2,
+    // A sweep keeps draining while batches come back full (bounded), so a burst
+    // of expiries is cleared in one pass instead of 2 items every 5 minutes.
+    maxBatchesPerSweep: 5,
+  }),
+  maintenance: Object.freeze({
+    intervalHours: 24,
+    // Hourly cron ticks inside this UTC hour run the housekeeping pass; every
+    // other tick skips it, so D1 is not touched 144 times a day for nothing.
+    utcHour: 3,
+    staleMetadataDays: 14,
+    finishedJobDays: 7,
+    batchSize: 500,
+    maxBatchesPerRun: 20,
+  }),
+  catalog: Object.freeze({
+    defaultPageSize: 24,
+    maxPageSize: 48,
+    maxSearchLength: 120,
+  }),
+});

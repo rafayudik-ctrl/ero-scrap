@@ -1,0 +1,16 @@
+node_modules/
+.npm/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.wrangler/
+.dev.db
+.dev.db-shm
+.dev.db-wal
+coverage/
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.*
+!.env.example

@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#f5f5f7">
+    <meta name="description" content="Ero-Scrap — catálogo privado de mídia autorizada.">
+    <title>Ero-Scrap — Catálogo privado</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="/assets/css/tokens.css">
+    <link rel="stylesheet" href="/assets/css/app.css">
+    <script src="/assets/js/runtime-config.js" defer></script>
+    <script type="module" src="/assets/js/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Pular para o conteúdo</a>
+
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Ero-Scrap, página inicial">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 28 28" fill="none">
+              <path d="M5 7.5 14 3l9 4.5v13L14 25l-9-4.5v-13Z" stroke="currentColor" stroke-width="1.5"/>
+              <path d="m11 10 7 4-7 4v-8Z" fill="currentColor"/>
+            </svg>
+          </span>
+          <span class="brand-name">ero<span>-</span>scrap</span>
+        </a>
+
+        <div class="topbar-actions">
+          <span class="environment-label"><span class="status-dot" aria-hidden="true"></span> Ambiente privado</span>
+          <button class="icon-button" id="theme-toggle" type="button" aria-label="Alternar tema" title="Alternar tema">
+            <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
+            <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5 8.5 8.5 0 1 0 20.5 15.5Z"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <main id="main" class="main-content">
+        <section class="intro" aria-labelledby="page-title">
+          <div class="intro-copy">
+            <p class="eyebrow">Sua biblioteca privada</p>
+            <h1 id="page-title">Tudo em seu<br><span>devido lugar.</span></h1>
+            <p class="intro-description">Um catálogo simples para organizar mídias que você tem autorização para armazenar.</p>
+          </div>
+          <div class="intro-meta" aria-label="Estado do sistema">
+            <div class="system-state">
+              <span class="state-indicator state-indicator-muted" id="api-indicator" aria-hidden="true"></span>
+              <div>
+                <span class="meta-label">Sistema</span>
+                <strong id="api-state">Conectando…</strong>
+              </div>
+            </div>
+            <div class="system-state">
+              <span class="state-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 3v18m9-9H3"/></svg>
+              </span>
+              <div>
+                <span class="meta-label">Modo de operação</span>
+                <strong id="operation-mode">Metadados apenas</strong>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="toolbar" aria-label="Ferramentas do catálogo">
+          <label class="search-field" for="catalog-search">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg>
+            <input id="catalog-search" type="search" maxlength="120" placeholder="Buscar por título ou tag" autocomplete="off">
+            <kbd id="search-shortcut">Ctrl K</kbd>
+          </label>
+          <div class="toolbar-meta">
+            <span class="result-count" id="result-count">— itens</span>
+            <button class="view-button is-active" id="view-grid" type="button" aria-label="Visualização em grade" aria-pressed="true">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            </button>
+            <button class="view-button" id="view-list" type="button" aria-label="Visualização em lista" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h12M9 12h12M9 19h12M3 5h.01M3 12h.01M3 19h.01"/></svg>
+            </button>
+          </div>
+        </section>
+
+        <section class="catalog-section" aria-labelledby="catalog-heading">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Biblioteca</p>
+              <h2 id="catalog-heading">Seus vídeos</h2>
+            </div>
+            <span class="section-note" id="last-scan">Aguardando executor</span>
+          </div>
+
+          <div class="notice notice-neutral" id="authorization-notice" role="status">
+            <span class="notice-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 1 1 8 0v3"/></svg>
+            </span>
+            <div>
+              <strong>Armazenamento com acesso individual</strong>
+              <p id="authorization-text">O catálogo mostra somente arquivos já armazenados. O primeiro clique inicia a retenção de 24 horas; itens não abertos expiram em sete dias. A trava de cópia permanece fechada até haver autorização.</p>
+            </div>
+            <span class="notice-status" id="authorization-status">Bloqueado</span>
+          </div>
+
+          <div class="catalog-grid" id="catalog-grid" aria-live="polite" aria-busy="true">
+            <div class="loading-card" aria-hidden="true"></div>
+            <div class="loading-card" aria-hidden="true"></div>
+            <div class="loading-card" aria-hidden="true"></div>
+          </div>
+
+          <div class="empty-state" id="empty-state" hidden>
+            <div class="empty-art" aria-hidden="true">
+              <svg viewBox="0 0 80 80" fill="none">
+                <rect x="11" y="15" width="58" height="50" rx="10" stroke="currentColor" stroke-width="1.5"/>
+                <path d="m34 29 17 11-17 11V29Z" fill="currentColor" opacity=".72"/>
+                <path d="M21 7v8m38-8v8M21 65v8m38-8v8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <p class="eyebrow" id="empty-eyebrow">Tudo pronto para começar</p>
+            <h3 id="empty-title">Sua biblioteca está vazia.</h3>
+            <p id="empty-description">Quando houver itens autorizados e armazenados, eles aparecerão aqui com miniaturas, duração e acesso individual.</p>
+          </div>
+
+          <div class="catalog-footer">
+            <span id="catalog-feedback" role="status">Aguardando conexão com a API.</span>
+            <button class="text-button" id="load-more" type="button" hidden>Carregar mais <span aria-hidden="true">→</span></button>
+          </div>
+        </section>
+
+        <section class="metrics" aria-label="Resumo da biblioteca">
+          <article class="metric-card">
+            <span class="metric-label">Armazenados</span>
+            <strong class="metric-value" id="metric-stored">—</strong>
+            <span class="metric-caption">Vídeos disponíveis</span>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">Acessados</span>
+            <strong class="metric-value" id="metric-clicked">—</strong>
+            <span class="metric-caption">Com prazo individual de 24 horas</span>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">Não acessados</span>
+            <strong class="metric-value" id="metric-unopened">—</strong>
+            <span class="metric-caption">Retenção prevista de 7 dias</span>
+          </article>
+        </section>
+
+        <footer class="footer">
+          <span>ERO-SCRAP <span class="footer-separator">/</span> ETAPA 3</span>
+          <span>Privado por padrão. Construído com simplicidade.</span>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

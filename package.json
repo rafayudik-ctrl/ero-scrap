@@ -1,0 +1,36 @@
+{
+  "name": "ero-scrap",
+  "version": "0.4.3",
+  "private": true,
+  "type": "module",
+  "description": "Monitoramento privado de mídia, armazenamento autorizado e catálogo temporário via GitHub Actions e Cloudflare Pages.",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "test": "node --test",
+    "check": "node scripts/check-syntax.mjs",
+    "dev:web": "npx --yes wrangler@4.156.0 pages dev apps/web/public --port 8788",
+    "db:create": "npx --yes wrangler@4.156.0 d1 create ero-scrap-db",
+    "db:local:apply": "npx --yes wrangler@4.156.0 d1 migrations apply ero-scrap-db --local --config wrangler.jsonc",
+    "db:remote:apply": "npx --yes wrangler@4.156.0 d1 migrations apply ero-scrap-db --remote --config wrangler.jsonc",
+    "r2:create": "npx --yes wrangler@4.156.0 r2 bucket create ero-scrap-thumbnails --config wrangler.jsonc",
+    "deploy:web": "npx --yes wrangler@4.156.0 pages deploy apps/web/public --project-name ero-scrap --config wrangler.jsonc",
+    "runner:once": "node --env-file-if-exists=.env apps/runner/src/index.js",
+    "runner:watch": "node --env-file-if-exists=.env apps/runner/src/index.js --watch",
+    "runner:cleanup": "node --env-file-if-exists=.env apps/runner/src/index.js --cleanup-once",
+    "runner:cleanup-check": "node --env-file-if-exists=.env apps/runner/src/index.js --cleanup-check",
+    "runner:work-check": "node --env-file-if-exists=.env apps/runner/src/index.js --work-check",
+    "runner:process-once": "node --env-file-if-exists=.env apps/runner/src/index.js --process-once",
+    "mega:check": "node --env-file-if-exists=.env apps/runner/src/index.js --mega-check",
+    "media:store-local": "node --env-file-if-exists=.env apps/runner/src/index.js --store-local",
+    "mega:login": "node scripts/mega-login.mjs",
+    "mega:logout": "node scripts/mega-logout.mjs",
+    "check:pages": "npx --yes wrangler@4.156.0 pages functions build functions --project-directory . --outdir .wrangler/pages-functions-build",
+    "dev:pages": "npx --yes wrangler@4.156.0 pages dev apps/web/public --port 8788 --config wrangler.jsonc",
+    "db:remote:apply:pages": "npx --yes wrangler@4.156.0 d1 migrations apply ero-scrap-db --remote --config wrangler.jsonc"
+  },
+  "dependencies": {
+    "jose": "6.2.14"
+  }
+}

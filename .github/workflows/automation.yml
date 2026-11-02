@@ -1,0 +1,173 @@
+name: Ero-Scrap automation
+
+# Two independent jobs so a long video download never delays the next scan:
+#   scan    - reads the "New" tab (about 1 minute, no MEGA, no dependencies).
+#   storage - processes at most one queued video and enforces retention. It only
+#             installs FFmpeg/MEGAcmd when there is real work to do.
+# The repository is meant to be public: Actions minutes are unlimited there.
+
+on:
+  schedule:
+    # Every ten minutes, deliberately offset from the top of the hour.
+    - cron: '7,17,27,37,47,57 * * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'auto follows COPY_AUTHORIZED; metadata scans only; full also processes one due video; cleanup runs retention only; mega-check tests the MEGA login.'
+        required: true
+        type: choice
+        default: auto
+        options:
+          - auto
+          - metadata
+          - full
+          - cleanup
+          - mega-check
+
+permissions:
+  contents: read
+
+env:
+  APP_ENV: production
+  COLLECTOR_API_URL: ${{ vars.COLLECTOR_API_URL }}
+  COLLECTOR_API_TOKEN: ${{ secrets.COLLECTOR_API_TOKEN }}
+  CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+  CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+  # Optional secret. When set it replaces config/search-keyword.txt, so a public
+  # repository does not reveal what is being monitored (secrets are masked in logs).
+  SEARCH_KEYWORD: ${{ secrets.SEARCH_KEYWORD }}
+
+jobs:
+  scan:
+    name: Scan the two New pages
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.mode == 'auto' || inputs.mode == 'metadata' || inputs.mode == 'full' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    concurrency:
+      group: ero-scrap-scan
+      cancel-in-progress: false
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v4
+
+      # The runner uses only Node built-ins, so no dependencies are downloaded.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - name: Scan and run daily housekeeping when due
+        run: node apps/runner/src/index.js --scan-only
+
+  storage:
+    name: Process one queued video and enforce retention
+    needs: scan
+    # A skipped or failed scan must never block retention or video processing.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    concurrency:
+      group: ero-scrap-storage
+      cancel-in-progress: false
+    env:
+      MEGA_REMOTE_ROOT: ${{ vars.MEGA_REMOTE_ROOT || '/Ero-Scrap' }}
+      MEGA_COMMAND_TIMEOUT_MS: '900000'
+      MEGA_CONFIGURED: ${{ secrets.MEGA_EMAIL != '' && secrets.MEGA_PASSWORD != '' }}
+      FFMPEG_BINARY: ffmpeg
+      FFPROBE_BINARY: ffprobe
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - name: Resolve run mode from the source-controlled authorization gate
+        id: mode
+        env:
+          REQUESTED_MODE: ${{ inputs.mode || 'auto' }}
+        run: node scripts/resolve-mode.mjs >> "$GITHUB_OUTPUT"
+
+      - name: Check pending processing and retention work
+        id: work
+        if: steps.mode.outputs.mode != 'mega-check'
+        run: node apps/runner/src/index.js --work-check
+
+      - name: Decide what needs MEGA
+        id: plan
+        env:
+          MODE: ${{ steps.mode.outputs.mode }}
+          MEDIA_DUE: ${{ steps.work.outputs.media_due }}
+          RETENTION_DUE: ${{ steps.work.outputs.retention_due }}
+        run: |
+          process=false; cleanup=false; mega=false
+          if [ "$MODE" = full ] && [ "$MEDIA_DUE" = true ]; then process=true; fi
+          if [ "$MODE" != mega-check ] && [ "$RETENTION_DUE" = true ]; then cleanup=true; fi
+          if [ "$process" = true ] || [ "$cleanup" = true ] || [ "$MODE" = mega-check ]; then mega=true; fi
+          {
+            echo "process=$process"
+            echo "cleanup=$cleanup"
+            echo "mega=$mega"
+          } >> "$GITHUB_OUTPUT"
+          echo "process=$process cleanup=$cleanup mega=$mega"
+
+      - name: Require MEGA credentials
+        if: steps.plan.outputs.process == 'true' || steps.mode.outputs.mode == 'mega-check'
+        env:
+          MEGA_EMAIL: ${{ secrets.MEGA_EMAIL }}
+          MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
+        run: |
+          test -n "$MEGA_EMAIL" || { echo 'MEGA_EMAIL is missing.'; exit 1; }
+          test -n "$MEGA_PASSWORD" || { echo 'MEGA_PASSWORD is missing.'; exit 1; }
+
+      - name: Install FFmpeg
+        if: steps.plan.outputs.process == 'true'
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1 || ! command -v ffprobe >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends ffmpeg
+          fi
+          ffmpeg -version | head -n 1
+
+      - name: Install official MEGAcmd
+        if: steps.plan.outputs.mega == 'true' && env.MEGA_CONFIGURED == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ca-certificates curl gnupg libfuse2t64
+          curl -fsSL https://mega.nz/linux/repo/xUbuntu_24.04/Release.key \
+            | sudo gpg --dearmor -o /usr/share/keyrings/meganz-archive-keyring.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/meganz-archive-keyring.gpg] https://mega.nz/linux/repo/xUbuntu_24.04/ ./" \
+            | sudo tee /etc/apt/sources.list.d/meganz.list >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends megacmd
+          mega-version
+
+      - name: Authenticate the ephemeral runner with MEGA
+        if: steps.plan.outputs.mega == 'true' && env.MEGA_CONFIGURED == 'true'
+        env:
+          MEGA_EMAIL: ${{ secrets.MEGA_EMAIL }}
+          MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
+          MEGA_TOTP_SECRET: ${{ secrets.MEGA_TOTP_SECRET }}
+        run: node scripts/mega-login.mjs
+
+      - name: Verify MEGA session without changing files
+        if: steps.mode.outputs.mode == 'mega-check'
+        run: node apps/runner/src/index.js --mega-check
+
+      - name: Process one queued video and enforce retention
+        if: steps.plan.outputs.process == 'true'
+        run: node apps/runner/src/index.js --process-once
+
+      - name: Run retention cleanup
+        if: steps.plan.outputs.cleanup == 'true' && steps.plan.outputs.process != 'true' && env.MEGA_CONFIGURED == 'true'
+        run: node apps/runner/src/index.js --cleanup-once
+
+      - name: Retention is due but MEGA credentials are not configured
+        if: steps.plan.outputs.cleanup == 'true' && env.MEGA_CONFIGURED != 'true'
+        run: echo 'Retention is due, but MEGA credentials are not configured. No deletion was attempted.'
+
+      - name: End the temporary MEGA session
+        if: always() && steps.plan.outputs.mega == 'true' && env.MEGA_CONFIGURED == 'true'
+        run: node scripts/mega-logout.mjs

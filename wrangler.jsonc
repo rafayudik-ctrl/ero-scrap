@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json.schemastore.org/wrangler.json",
+  "name": "ero-scrap",
+  "pages_build_output_dir": "./apps/web/public",
+  "compatibility_date": "2026-11-01",
+  "vars": {
+    "APP_ENV": "production",
+    "WEB_ORIGIN": "https://ero-scrap.pages.dev"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ero-scrap-db",
+      "database_id": "00000000-0000-4000-8000-000000000001",
+      "migrations_dir": "database/migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "THUMBNAILS",
+      "bucket_name": "ero-scrap-thumbnails"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { loadRunnerConfig, loadMegaConfig } from '../../../apps/runner/src/config/env.js';
+
+const validEnv = {
+  APP_ENV: 'production',
+  COLLECTOR_API_URL: 'https://api.example.test/internal/collector',
+  COLLECTOR_API_TOKEN: 'a'.repeat(64),
+  CF_ACCESS_CLIENT_ID: 'access-id',
+  CF_ACCESS_CLIENT_SECRET: 'access-secret',
+};
+
+test('runner config uses the fixed keyword file and does not accept an env override', () => {
+  const config = loadRunnerConfig({ ...validEnv, SEARCH_KEYWORD_FILE: '/tmp/other-keyword.txt' });
+  assert.match(config.keywordFilePath, /config[\\/]search-keyword\.txt$/u);
+  assert.equal(config.scanIntervalMs, 600_000);
+  assert.equal(config.maxPostInspectionsPerRun, 160);
+  assert.equal(config.collectorApiUrl, validEnv.COLLECTOR_API_URL);
+  assert.equal(config.accessClientId, 'access-id');
+});
+
+test('runner config allows plain HTTP only for localhost in development', () => {
+  const config = loadRunnerConfig({
+    ...validEnv,
+    APP_ENV: 'development',
+    COLLECTOR_API_URL: 'http://127.0.0.1:8787/internal/collector',
+  });
+  assert.equal(config.collectorApiUrl, 'http://127.0.0.1:8787/internal/collector');
+  assert.throws(() => loadRunnerConfig({
+    ...validEnv,
+    COLLECTOR_API_URL: 'http://api.example.test/internal/collector',
+  }), /HTTPS/);
+});
+
+test('runner config rejects missing and malformed collector credentials', () => {
+  assert.throws(() => loadRunnerConfig({}), /COLLECTOR_API_URL/);
+  assert.throws(() => loadRunnerConfig({ ...validEnv, COLLECTOR_API_TOKEN: 'short' }), /32 characters/);
+  assert.throws(() => loadRunnerConfig({ ...validEnv, CF_ACCESS_CLIENT_SECRET: '' }), /configured together/);
+  const local = loadRunnerConfig({ ...validEnv, APP_ENV: 'development', CF_ACCESS_CLIENT_ID: '', CF_ACCESS_CLIENT_SECRET: '' });
+  assert.equal(local.accessClientId, null);
+  assert.throws(() => loadRunnerConfig({ ...validEnv, COLLECTOR_API_URL: 'https://api.example.test/anything' }), /end exactly/);
+});
+
+
+test('MEGA check configuration is independent from Cloudflare API credentials', () => {
+  const config = loadMegaConfig({ MEGA_REMOTE_ROOT: '/Private/Ero-Scrap', MEGA_COMMAND_TIMEOUT_MS: '45000' });
+  assert.equal(config.megaRemoteRoot, '/Private/Ero-Scrap');
+  assert.equal(config.megaCommandTimeoutMs, 45_000);
+  assert.equal(config.ffmpegBinary, 'ffmpeg');
+  assert.equal(config.ffprobeBinary, 'ffprobe');
+  assert.equal(loadMegaConfig({ FFPROBE_BINARY: 'ffprobe-custom' }).ffprobeBinary, 'ffprobe-custom');
+});

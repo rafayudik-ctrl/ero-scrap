@@ -1,0 +1,8 @@
+# Copy to apps/api/.dev.vars for local development.
+# This bypass is only honored when APP_ENV is exactly "development".
+APP_ENV=development
+DEV_AUTH_BYPASS=true
+WEB_ORIGIN=http://localhost:8788
+
+# Private runner -> Worker authentication (same value in local .env).
+RUNNER_API_TOKEN=replace-with-a-64-character-random-secret
