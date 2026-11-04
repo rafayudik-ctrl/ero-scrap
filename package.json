@@ -1,6 +1,6 @@
 {
   "name": "ero-scrap",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "private": true,
   "type": "module",
   "description": "Monitoramento privado de mídia, armazenamento autorizado e catálogo temporário via GitHub Actions e Cloudflare Pages.",

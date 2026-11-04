@@ -10,6 +10,7 @@ import {
   listCatalogItems,
   recordFirstClickAndGetShareUrl,
 } from './repositories/catalog-repository.js';
+import { loadThumbnail, thumbnailBackend, thumbnailStorageReady } from './lib/thumbnail-store.js';
 import { handleInternalCollector, handleInternalThumbnailUpload } from './services/internal-collector.js';
 
 const API_PREFIX = '/api';
@@ -81,7 +82,7 @@ async function handleOpenItem(request, env, itemId) {
 }
 
 async function handleThumbnail(request, env, itemId, corsHeaders) {
-  if (!hasDatabase(env) || !env.THUMBNAILS || typeof env.THUMBNAILS.get !== 'function') {
+  if (!thumbnailStorageReady(env)) {
     return applyCors(errorResponse('thumbnail_storage_unavailable', 'Thumbnail storage is not configured.', 503), corsHeaders);
   }
   const authResult = await authenticatePublicRequest(request, env, corsHeaders);
@@ -92,7 +93,7 @@ async function handleThumbnail(request, env, itemId, corsHeaders) {
     if (!key || key !== `thumbnails/${itemId}.webp`) {
       return applyCors(errorResponse('thumbnail_not_found', 'Thumbnail not found.', 404), corsHeaders);
     }
-    const object = await env.THUMBNAILS.get(key);
+    const object = await loadThumbnail(env, itemId);
     if (!object) return applyCors(errorResponse('thumbnail_not_found', 'Thumbnail not found.', 404), corsHeaders);
 
     return applyCors(new Response(object.body, {
@@ -100,9 +101,9 @@ async function handleThumbnail(request, env, itemId, corsHeaders) {
         'Content-Type': 'image/webp',
         'Content-Length': String(object.size),
         // The thumbnail of an asset never changes and the asset lives at most about
-        // eight days, so the browser can keep it and skip the Worker + D1 + R2 round trip.
+        // eight days, so the browser can keep it and skip the Worker + storage round trip.
         'Cache-Control': 'private, max-age=86400, immutable',
-        ...(object.httpEtag ? { ETag: object.httpEtag } : {}),
+        ...(object.etag ? { ETag: object.etag } : {}),
         'X-Content-Type-Options': 'nosniff',
         'Content-Disposition': 'inline; filename="thumbnail.webp"',
         'Referrer-Policy': 'no-referrer',
@@ -159,6 +160,7 @@ async function handleApi(request, env) {
         stage: APP_CONFIG.stage,
         mode: 'catalog-and-retention',
         copyAuthorized: isCopyAuthorized(),
+        thumbnailStore: thumbnailBackend(env),
         // Counters ride along so the page needs one request instead of two.
         stats,
         monitor: {

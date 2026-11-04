@@ -1,6 +1,7 @@
 import { executeCollectorCommand } from './collector-service.js';
 import { isCopyAuthorized } from '../../../../packages/config/src/security.js';
 import { errorResponse, jsonResponse } from '../lib/http.js';
+import { saveThumbnail, thumbnailDeleter, thumbnailStorageReady } from '../lib/thumbnail-store.js';
 
 const MAX_BODY_BYTES = 512 * 1024;
 const MIN_TOKEN_LENGTH = 32;
@@ -102,7 +103,7 @@ export async function handleInternalCollector(request, env) {
   }
 
   try {
-    const data = await executeCollectorCommand(env.DB, body.operation, body.payload, { thumbnails: env.THUMBNAILS });
+    const data = await executeCollectorCommand(env.DB, body.operation, body.payload, { thumbnails: thumbnailDeleter(env) });
     return jsonResponse({ ok: true, data });
   } catch (error) {
     const knownCode = new Set(['unknown_operation']).has(error?.code);
@@ -164,7 +165,7 @@ export async function handleInternalThumbnailUpload(request, env, assetId) {
   if ((request.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase() !== 'image/webp') {
     return errorResponse('unsupported_media_type', 'Thumbnail must use image/webp.', 415);
   }
-  if (!env.DB || typeof env.DB.prepare !== 'function' || !env.THUMBNAILS || typeof env.THUMBNAILS.put !== 'function') {
+  if (!thumbnailStorageReady(env)) {
     return errorResponse('thumbnail_storage_unavailable', 'Thumbnail storage is not configured.', 503);
   }
 
@@ -172,27 +173,13 @@ export async function handleInternalThumbnailUpload(request, env, assetId) {
   try { bytes = await readThumbnailBody(request); }
   catch (error) { return errorResponse(error?.code ?? 'invalid_thumbnail', error?.message ?? 'Invalid thumbnail.', error?.status ?? 400); }
 
-  const key = `thumbnails/${assetId}.webp`;
-  let objectStored = false;
-  const now = new Date().toISOString();
   try {
-    await env.THUMBNAILS.put(key, bytes, {
-      httpMetadata: { contentType: 'image/webp', cacheControl: 'private, max-age=300' },
-      customMetadata: { assetId },
-    });
-    objectStored = true;
-    const result = await env.DB.prepare(`
-      UPDATE video_assets
-      SET thumbnail_key = ?, thumbnail_content_type = 'image/webp', updated_at = ?
-      WHERE id = ? AND status IN ('stored', 'clicked') AND expires_at > ?
-    `).bind(key, now, assetId, now).run();
-    if (Number(result?.meta?.changes ?? 0) !== 1) {
-      await env.THUMBNAILS.delete(key);
+    const saved = await saveThumbnail(env, assetId, bytes, new Date().toISOString());
+    if (!saved) {
       return errorResponse('asset_not_stored', 'Thumbnail can only be attached to an active stored item.', 404);
     }
     return jsonResponse({ ok: true, data: { stored: true } });
   } catch {
-    if (objectStored) await env.THUMBNAILS.delete(key).catch(() => {});
     return errorResponse('thumbnail_store_failed', 'Could not store the thumbnail.', 503);
   }
 }

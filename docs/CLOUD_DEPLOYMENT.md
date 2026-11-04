@@ -1,6 +1,6 @@
 # Implantação 100% em nuvem — GitHub Actions + Cloudflare Pages
 
-Este é o procedimento recomendado para manter o Ero-Scrap funcionando sem um computador ou servidor seu ligado. O GitHub Actions fornece runners Linux temporários; o Cloudflare Pages hospeda a interface e as Pages Functions; D1 guarda metadados; R2 guarda miniaturas privadas; MEGA guarda os arquivos de vídeo autorizados.
+Este é o procedimento recomendado para manter o Ero-Scrap funcionando sem um computador ou servidor seu ligado. O GitHub Actions fornece runners Linux temporários; o Cloudflare Pages hospeda a interface e as Pages Functions; D1 guarda metadados e, por padrão, as miniaturas (R2 é uma opção); MEGA guarda os arquivos de vídeo autorizados.
 
 > **Atenção:** `COPY_AUTHORIZED` permanece `false` no código entregue. Nesse estado, o workflow agenda e executa apenas a varredura de metadados. Para habilitar transferência, é necessário que o operador tenha autorização válida para copiar o material e altere deliberadamente a constante central. Não contorne login, CAPTCHA, 401/403, 429, DRM, controles de acesso ou limitações do Erome. O coletor interrompe a operação quando a fonte recusa o acesso.
 
@@ -13,7 +13,7 @@ Este é o procedimento recomendado para manter o Ero-Scrap funcionando sem um co
 | Cloudflare Pages | HTML, CSS e JavaScript estáticos |
 | Cloudflare Pages Functions | API same-origin e autenticação |
 | Cloudflare D1 | Publicações, vídeos, estados, jobs e retenção |
-| Cloudflare R2 | Miniaturas WebP em bucket privado |
+| Cloudflare D1 (padrão) ou R2 (opcional) | Miniaturas WebP pequenas, privadas. D1 não exige cartão de crédito; R2 pode exigir |
 | MEGA | Arquivos de vídeo temporários |
 
 O runner não permanece ligado. Cada execução inicia uma VM do GitHub Actions, instala o que for necessário, executa a tarefa e termina. Os arquivos temporários são removidos no final e a VM é descartada.
@@ -37,7 +37,7 @@ O site não baixa nem reproduz vídeos no navegador. A página recebe metadados 
 - Abra o terminal integrado do Codespaces e execute:
 
 ```bash
-unzip -q ero-scrap-cloud-runner-v0.4.3.zip -d /tmp/ero-scrap-release
+unzip -q ero-scrap-cloud-runner-v0.4.4.zip -d /tmp/ero-scrap-release
 cp -a /tmp/ero-scrap-release/. .
 rm -rf /tmp/ero-scrap-release
 git status --short
@@ -50,16 +50,30 @@ git status --short
 
 O GitHub permite enviar no navegador até 100 arquivos por operação e limita cada arquivo enviado pelo navegador a 25 MiB; o ZIP evita ter que enviar centenas de arquivos separadamente. Confira os limites atuais antes de criar um Codespace se sua conta tiver franquia reduzida.
 
-## 3. Preparar o Cloudflare D1 e R2
+## 3. Preparar o Cloudflare D1 (e, opcionalmente, R2)
 
 No painel Cloudflare:
 
 1. Abra **Workers & Pages → D1 SQL Database → Create**.
 2. Crie o banco com o nome exato `ero-scrap-db`.
 3. Copie o `database_id` exibido.
-4. Abra **R2 Object Storage → Create bucket**.
-5. Crie o bucket com o nome exato `ero-scrap-thumbnails`.
-6. Mantenha o bucket privado. Não habilite `r2.dev` nem um domínio público.
+
+### Onde ficam as miniaturas: D1 ou R2
+
+A variável `THUMBNAIL_STORE` em `wrangler.jsonc` escolhe o armazenamento das miniaturas. Só um fica ativo por vez.
+
+| Valor | O que é | Exige |
+|---|---|---|
+| `"d1"` (padrão) | Miniaturas WebP (poucos KB cada) dentro do próprio banco D1, apagadas junto com o item | Nada além do D1. Sem cartão de crédito |
+| `"r2"` | Miniaturas em um bucket R2 privado | Conta R2 ativada (a Cloudflare pode pedir cartão), bucket e binding |
+
+Para usar **R2** em vez de D1:
+
+1. Em **R2 Object Storage → Create bucket**, crie `ero-scrap-thumbnails`. Mantenha privado; não habilite `r2.dev`.
+2. No `wrangler.jsonc`, troque `"THUMBNAIL_STORE": "d1"` por `"THUMBNAIL_STORE": "r2"` e remova o `//` da linha `{ "binding": "THUMBNAILS", ... }`.
+3. Faça commit em `main`. O Pages publica de novo.
+
+Para voltar ao D1, desfaça as duas alterações. Trocar de um para o outro **não migra** as miniaturas já existentes: os itens antigos ficam sem prévia ("Prévia indisponível") até expirarem (no máximo cerca de 8 dias), e os novos já usam o armazenamento escolhido. As migrations criam a tabela `thumbnails` do D1 mesmo se você usar R2; ela só fica vazia.
 
 No GitHub, abra `wrangler.jsonc` e substitua:
 
@@ -69,7 +83,7 @@ No GitHub, abra `wrangler.jsonc` e substitua:
 
 pelo ID real do D1. Não altere `database_name`, `binding`, `bucket_name` ou `migrations_dir` sem atualizar os códigos dependentes. Faça commit para `main`.
 
-O `wrangler.jsonc` da raiz é a fonte de configuração do projeto Pages: ele declara `pages_build_output_dir`, o binding D1 e o binding R2. As Pages Functions são compiladas com `wrangler pages functions build`, e os bindings podem ser declarados pelo arquivo Wrangler ou pelo painel; mantenha as duas configurações consistentes.
+O `wrangler.jsonc` da raiz é a fonte de configuração do projeto Pages: ele declara `pages_build_output_dir`, o binding D1, a variável `THUMBNAIL_STORE` e (se você escolher R2) o binding R2. As Pages Functions são compiladas com `wrangler pages functions build`, e os bindings podem ser declarados pelo arquivo Wrangler ou pelo painel; mantenha as duas configurações consistentes.
 
 ## 4. Criar o projeto Cloudflare Pages com Git Integration
 
@@ -257,7 +271,7 @@ A automação revalida o título/tag, o ID individual, a duração da página e 
 - `/api/status` deve mostrar `copyAuthorized: false` antes da autorização; a faixa "Bloqueado/Liberado" da página segue esse valor.
 - `/api/catalog` não deve devolver `share_url` nem `storage_object_id`.
 - `/internal/collector` sem Access Service Token e Bearer token deve responder 401/403.
-- O bucket R2 deve continuar privado.
+- `/api/status` mostra `thumbnailStore` com o armazenamento ativo (`d1` ou `r2`). Se usar R2, o bucket deve continuar privado.
 - A palavra-chave está no secret `SEARCH_KEYWORD` (ou, sem secret, em `config/search-keyword.txt`).
 - Os workflows de CI precisam passar antes de qualquer mudança de produção.
 
@@ -275,7 +289,8 @@ O tempo por execução foi reduzido: o runner usa apenas módulos nativos do Nod
 |---|---|---|
 | Pages Functions (Workers) | 100.000 requisições/dia | Cada ciclo faz algumas dezenas de chamadas internas; só álbuns ainda não inspecionados geram chamadas extras. A ordem de grandeza fica em poucos milhares por dia |
 | D1 | 100.000 linhas escritas/dia; 5 milhões lidas/dia | Apenas álbuns novos geram escrita; a limpeza roda uma vez por dia |
-| R2 | 10 GB, operações mensais incluídas | Miniaturas WebP pequenas |
+| D1 (miniaturas, padrão) | 5 GB no total; 100.000 linhas escritas/dia | Uma linha de poucos KB por vídeo, apagada com o item: bem abaixo dos limites |
+| R2 (opcional) | 10 GB, operações mensais incluídas | Miniaturas WebP pequenas |
 | Pages (builds) | 500 builds/mês | Um build por commit; evite commits frequentes em `main` |
 
 Os valores acima vêm da documentação pública da Cloudflare no momento desta revisão; confira os limites atuais no painel.

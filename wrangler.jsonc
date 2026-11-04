@@ -5,7 +5,10 @@
   "compatibility_date": "2026-11-01",
   "vars": {
     "APP_ENV": "production",
-    "WEB_ORIGIN": "https://ero-scrap.pages.dev"
+    "WEB_ORIGIN": "https://ero-scrap.pages.dev",
+    // Where thumbnails are kept. "d1" needs nothing else (default, no credit card).
+    // To use R2 instead: change this to "r2" AND enable the r2_buckets line below.
+    "THUMBNAIL_STORE": "d1"
   },
   "d1_databases": [
     {
@@ -16,9 +19,8 @@
     }
   ],
   "r2_buckets": [
-    {
-      "binding": "THUMBNAILS",
-      "bucket_name": "ero-scrap-thumbnails"
-    }
+    // To use R2 instead of D1: remove the // from the next line (bucket must exist)
+    // and set THUMBNAIL_STORE to "r2" above.
+    // { "binding": "THUMBNAILS", "bucket_name": "ero-scrap-thumbnails" }
   ]
 }

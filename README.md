@@ -1,6 +1,6 @@
 # Ero-Scrap
 
-Sistema pessoal de monitoramento de publicações recentes, com catálogo privado de vídeos temporários. A implantação recomendada não exige computador ou servidor seu ligado: **GitHub Actions** executa tarefas em runners Linux `ubuntu-24.04` efêmeros; **Cloudflare Pages + Pages Functions** hospeda a interface/API; **D1** armazena metadados; **R2** armazena miniaturas privadas; **MEGA** armazena os arquivos autorizados.
+Sistema pessoal de monitoramento de publicações recentes, com catálogo privado de vídeos temporários. A implantação recomendada não exige computador ou servidor seu ligado: **GitHub Actions** executa tarefas em runners Linux `ubuntu-24.04` efêmeros; **Cloudflare Pages + Pages Functions** hospeda a interface/API; **D1** armazena metadados e miniaturas (R2 é uma alternativa opcional, escolhida em `THUMBNAIL_STORE`); **MEGA** armazena os arquivos autorizados.
 
 > **Trava de cópia:** `packages/config/src/security.js` mantém `COPY_AUTHORIZED = false`. Assim, o agendamento opera em modo de metadados e não baixa nem copia arquivos de vídeo. Transferências só podem ser habilitadas deliberadamente depois que o responsável tiver autorização válida. O código não tenta contornar login, CAPTCHA, DRM, 401/403, 429 ou controles de acesso da fonte.
 
@@ -12,7 +12,7 @@ Sistema pessoal de monitoramento de publicações recentes, com catálogo privad
 - Ignorar posts somente com imagens e ignorar imagens em posts mistos.
 - Aceitar vídeos somente quando a duração é explicitamente conhecida e `0 < duração <= 600000 ms` (10 minutos).
 - Identificar cada vídeo individualmente, evitar duplicados e processar uma tarefa por vez.
-- Quando cópia autorizada estiver ativa, armazenar vídeos no MEGA e miniaturas WebP privadas no R2.
+- Quando cópia autorizada estiver ativa, armazenar vídeos no MEGA e miniaturas WebP privadas no D1 (padrão, sem cartão) ou no R2 (opcional).
 - Primeiro clique válido inicia prazo de 24 horas; sem clique, prazo de sete dias após o upload. O prazo não é renovado por cliques posteriores.
 
 ## Arquitetura
@@ -38,7 +38,7 @@ Defina o secret `SEARCH_KEYWORD` no GitHub (o valor é mascarado nos logs e não
 
 ## Implantação sem computador ligado
 
-Siga **[docs/CLOUD_DEPLOYMENT.md](docs/CLOUD_DEPLOYMENT.md)**. O guia cobre GitHub público, Cloudflare Pages Git Integration, D1, R2, Cloudflare Access, secrets do GitHub, migrations, cron e teste em modo metadata.
+Siga **[docs/CLOUD_DEPLOYMENT.md](docs/CLOUD_DEPLOYMENT.md)**. O guia cobre GitHub público, Cloudflare Pages Git Integration, D1 (R2 opcional), Cloudflare Access, secrets do GitHub, migrations, cron e teste em modo metadata.
 
 Resumo dos workflows:
 
@@ -63,7 +63,7 @@ Para desenvolvimento local, consulte [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 - Cloudflare Access protege a interface/API para o e-mail permitido; um Service Token protege `/internal/*`.
 - A API interna exige também Bearer token próprio e só aceita comandos allowlisted; o runner nunca recebe token administrativo Cloudflare nem SQL.
-- Bucket R2 privado; URL MEGA não aparece no JSON público do catálogo.
+- Miniaturas privadas (D1 ou bucket R2 privado); URL MEGA não aparece no JSON público do catálogo.
 - 401/403, redirects e hosts fora da allowlist interrompem o downloader sem fallback de acesso; 429 é reagendado.
 - GitHub Actions schedule é best-effort, não um relógio de tempo real. Jobs podem atrasar ou ser coalescidos quando houver execução sobreposta.
 - O cron a cada dez minutos executa cerca de 4.320 jobs/mês. A verificação de retenção é feita dentro do mesmo job, sem um cron extra. Em repositório **público** os minutos de Actions são gratuitos e ilimitados; em um privado, a franquia gratuita de 2.000 min/mês não comporta esse ritmo. O workflow `keepalive` reativa os agendamentos semanalmente para o GitHub não desligá-los após 60 dias sem atividade.

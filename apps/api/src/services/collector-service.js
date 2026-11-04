@@ -353,7 +353,7 @@ export async function executeCollectorCommand(db, operation, rawPayload, { thumb
       const key = await repository.getDeletionThumbnailKey({ assetId, jobId, leaseToken });
       if (key) {
         if (!thumbnails || typeof thumbnails.delete !== 'function') {
-          throw new Error('R2 thumbnail binding is unavailable; catalog deletion is deferred.');
+          throw new Error('Thumbnail storage is unavailable; catalog deletion is deferred.');
         }
         await thumbnails.delete(key);
       }
