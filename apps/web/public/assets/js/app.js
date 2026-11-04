@@ -1,4 +1,4 @@
-import { getCatalogPage, getSystemStatus, getOpenActionUrl, resolveApiAssetUrl } from './api.js';
+import { getCatalogPage, getSystemStatus, getOpenActionUrl, resolveApiAssetUrl, login, logout } from './api.js';
 
 const elements = {
   themeToggle: document.querySelector('#theme-toggle'),
@@ -20,6 +20,12 @@ const elements = {
   stored: document.querySelector('#metric-stored'),
   clicked: document.querySelector('#metric-clicked'),
   unopened: document.querySelector('#metric-unopened'),
+  loginPanel: document.querySelector('#login-panel'),
+  loginForm: document.querySelector('#login-form'),
+  loginPassword: document.querySelector('#login-password'),
+  loginSubmit: document.querySelector('#login-submit'),
+  loginError: document.querySelector('#login-error'),
+  logoutButton: document.querySelector('#logout-button'),
   authText: document.querySelector('#authorization-text'),
   authStatus: document.querySelector('#authorization-status'),
 };
@@ -150,6 +156,45 @@ function showEmptyState({ title, description, eyebrow = 'Tudo pronto para começ
   elements.grid.hidden = true;
 }
 
+function needsLogin(error) {
+  return error?.status === 401 && error?.code === 'authentication_required';
+}
+
+function showLogin(visible) {
+  elements.loginPanel.hidden = !visible;
+  if (visible) {
+    elements.grid.hidden = true;
+    elements.emptyState.hidden = true;
+    elements.loadMore.hidden = true;
+    elements.loginPassword.focus();
+  }
+}
+
+async function onLoginSubmit(event) {
+  event.preventDefault();
+  elements.loginSubmit.disabled = true;
+  elements.loginError.hidden = true;
+  try {
+    await login(elements.loginPassword.value);
+    elements.loginPassword.value = '';
+    showLogin(false);
+    void loadStatus();
+    void loadCatalog();
+  } catch (error) {
+    elements.loginError.textContent = error.status === 429
+      ? 'Muitas tentativas. Aguarde alguns minutos.'
+      : error.status === 401 ? 'Senha incorreta.' : 'Não foi possível entrar agora.';
+    elements.loginError.hidden = false;
+  } finally {
+    elements.loginSubmit.disabled = false;
+  }
+}
+
+async function onLogout() {
+  try { await logout(); } catch { /* The cookie also expires by itself. */ }
+  window.location.reload();
+}
+
 async function loadCatalog({ append = false } = {}) {
   state.searchController?.abort();
   const controller = new AbortController();
@@ -197,6 +242,7 @@ async function loadCatalog({ append = false } = {}) {
     }
   } catch (error) {
     if (error.name === 'AbortError') return;
+    if (needsLogin(error)) { elements.resultCount.textContent = '— itens'; showLogin(true); return; }
     elements.resultCount.textContent = '— itens';
     elements.feedback.textContent = error.status === 401 || error.status === 403
       ? 'Acesso protegido. Entre pelo Cloudflare Access.'
@@ -229,8 +275,17 @@ async function loadStatus() {
     if (result.monitor?.latestScan?.startedAt) {
       elements.lastScan.textContent = `Última verificação: ${formatDate(result.monitor.latestScan.startedAt)}`;
     }
+    elements.logoutButton.hidden = result.authMode !== 'password';
     renderStats(result.stats);
   } catch (error) {
+    if (needsLogin(error)) {
+      setApiState('Aguardando login', 'error');
+      elements.operationMode.textContent = '—';
+      elements.lastScan.textContent = 'Entre para ver o catálogo';
+      renderStats(null);
+      showLogin(true);
+      return;
+    }
     setApiState(error.status === 401 || error.status === 403 ? 'Acesso protegido' : 'Indisponível', 'error');
     elements.operationMode.textContent = 'Indisponível';
     renderStats(null);
@@ -302,6 +357,8 @@ function initialize() {
     setTheme(nextTheme);
   });
   elements.search.addEventListener('input', onSearchInput);
+  elements.loginForm.addEventListener('submit', onLoginSubmit);
+  elements.logoutButton.addEventListener('click', onLogout);
   elements.loadMore.addEventListener('click', () => loadCatalog({ append: true }));
   initializeView();
   initializeKeyboardShortcut();

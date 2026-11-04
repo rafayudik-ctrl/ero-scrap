@@ -18,6 +18,7 @@ test('health endpoint is public and exposes no configuration secrets', async () 
 test('API routes fail closed without an Access identity', async () => {
   const response = await worker.fetch(makeRequest('/api/status'), {
     APP_ENV: 'production',
+    AUTH_MODE: 'access',
     TEAM_DOMAIN: 'https://example.cloudflareaccess.com',
     POLICY_AUD: 'expected-audience',
     ALLOWED_EMAILS: 'owner@example.test',
@@ -37,9 +38,13 @@ test('local auth bypass is honored only in explicit development mode', async () 
 
   const productionResponse = await worker.fetch(makeRequest('/api/status'), {
     APP_ENV: 'production',
+    AUTH_MODE: 'access',
     DEV_AUTH_BYPASS: 'true',
   });
   assert.equal(productionResponse.status, 401);
+  // Password mode without a configured password also fails closed.
+  const unconfigured = await worker.fetch(makeRequest('/api/status'), { APP_ENV: 'production', DEV_AUTH_BYPASS: 'true' });
+  assert.equal(unconfigured.status, 503);
 });
 
 test('only GET and OPTIONS methods are accepted by the public API', async () => {

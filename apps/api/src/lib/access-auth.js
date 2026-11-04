@@ -1,5 +1,6 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 
+// Imported lazily by lib/auth.js, only when AUTH_MODE is "access".
 const MAX_TOKEN_LENGTH = 8_192;
 const jwksByTeamDomain = new Map();
 
@@ -39,15 +40,8 @@ function allowedEmailSet(value) {
   );
 }
 
-/**
- * Cloudflare Access is the production identity provider. In development only,
- * an explicit local bypass can be enabled in an untracked .dev.vars file.
- */
-export async function authenticateRequest(request, env) {
-  if (env.APP_ENV === 'development' && env.DEV_AUTH_BYPASS === 'true') {
-    return { ok: true, email: 'local-development' };
-  }
-
+/** Cloudflare Access identity check (AUTH_MODE="access"). */
+export async function authenticateAccess(request, env) {
   const token = request.headers.get('cf-access-jwt-assertion');
   if (!token || token.length > MAX_TOKEN_LENGTH) {
     return { ok: false, status: 401, code: 'authentication_required' };

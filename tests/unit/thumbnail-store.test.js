@@ -105,6 +105,7 @@ test('wrangler.jsonc ships with d1 selected and no R2 binding that could break t
   const text = await readFile('wrangler.jsonc', 'utf8');
   const config = JSON.parse(text.replace(/^\s*\/\/.*$/gmu, ''));
   assert.equal(config.vars.THUMBNAIL_STORE, 'd1');
+  assert.equal(config.vars.AUTH_MODE, 'password');
   assert.deepEqual(config.r2_buckets, []);
   assert.equal(config.d1_databases[0].binding, 'DB');
 });

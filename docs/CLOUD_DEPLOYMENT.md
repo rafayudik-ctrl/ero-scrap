@@ -37,7 +37,7 @@ O site não baixa nem reproduz vídeos no navegador. A página recebe metadados 
 - Abra o terminal integrado do Codespaces e execute:
 
 ```bash
-unzip -q ero-scrap-cloud-runner-v0.4.4.zip -d /tmp/ero-scrap-release
+unzip -q ero-scrap-cloud-runner-v0.4.5.zip -d /tmp/ero-scrap-release
 cp -a /tmp/ero-scrap-release/. .
 rm -rf /tmp/ero-scrap-release
 git status --short
@@ -112,32 +112,53 @@ Abra `wrangler.jsonc` no GitHub e altere:
 
 para a URL real do Pages, sem barra final. Faça commit e aguarde o próximo deploy.
 
-## 6. Proteger o site com Cloudflare Access
+## 6. Proteger o site: senha (padrão) ou Cloudflare Access
 
-O catálogo é privado. Configure duas aplicações Self-hosted no Cloudflare Zero Trust → Access → Applications:
+A variável `AUTH_MODE` em `wrangler.jsonc` escolhe como o site fica privado. Só um modo fica ativo por vez; um valor desconhecido deixa o site **fechado** (erro 503), nunca aberto.
 
-### Aplicação humana
+| Modo | O que é | Exige |
+|---|---|---|
+| `"password"` (padrão) | Uma senha só sua (secret `SITE_PASSWORD`). A página mostra um campo de login e guarda um cookie assinado por 30 dias | Nada além do Pages. Sem Zero Trust, sem cartão |
+| `"access"` | Cloudflare Zero Trust Access: login por código enviado ao seu e-mail, com a página inteira protegida na borda | Conta Zero Trust (a Cloudflare pode pedir forma de pagamento) |
+
+### Modo `password` (padrão)
+
+1. Crie uma senha longa e exclusiva, de pelo menos 12 caracteres (frase com várias palavras serve). Ela é o único segredo que protege o catálogo.
+2. No Pages → Settings → Variables and Secrets → Production, crie o secret `SITE_PASSWORD` com essa senha.
+3. Ao abrir o site, a página mostra o campo **Entrar**. O botão **Sair** aparece no topo.
+
+Como funciona e quais são os limites:
+
+- O servidor compara a senha sem vazar o tempo de resposta e guarda apenas um cookie assinado (`HttpOnly`, `Secure`, `SameSite=Strict`), nunca a senha. Trocar `SITE_PASSWORD` desconecta todos os navegadores.
+- 5 senhas erradas seguidas do mesmo IP bloqueiam esse IP por 15 minutos, e 30 falhas somadas bloqueiam todo mundo pelo mesmo período. O contador é uma linha pequena no D1, gravada só em falhas.
+- A **estrutura** da página (HTML, CSS e JavaScript) fica pública, mas ela não contém dados. Catálogo, miniaturas e abertura de vídeos exigem o cookie.
+- Não há recuperação de senha: se esquecer, defina outra no secret.
+- É uma senha única. Use o Access se precisar de várias pessoas, e-mails individuais ou autenticação em dois fatores.
+
+### Modo `access` (Cloudflare Zero Trust)
+
+No `wrangler.jsonc`, troque `"AUTH_MODE": "password"` por `"AUTH_MODE": "access"`. Configure duas aplicações Self-hosted no Cloudflare Zero Trust → Access → Applications:
+
+#### Aplicação humana
 
 - Hostname: seu hostname Pages, por exemplo `ero-scrap.pages.dev`.
 - Path: `/*`.
 - Policy: `Allow` somente para seu endereço de e-mail.
 - Não crie uma regra pública/Everyone.
 
-### Aplicação interna do runner
+#### Aplicação interna do runner (opcional)
 
 - Mesmo hostname Pages.
 - Path: `/internal/*`.
 - Crie um **Service Token** no Access.
 - Policy: `Service Auth` permitindo somente esse Service Token.
 
-A aplicação mais específica `/internal/*` deve proteger a API interna com a identidade de serviço. A aplicação humana protege site e rotas `/api/*`. O Worker também exige seu próprio Bearer token; Access é uma camada adicional, não substitui o token interno.
+Essa segunda aplicação é uma camada extra: o Worker sempre exige o Bearer token `RUNNER_API_TOKEN` em `/internal/*`, com qualquer modo. Se você a criar, cadastre também os secrets `CF_ACCESS_CLIENT_ID` e `CF_ACCESS_CLIENT_SECRET` no GitHub; sem a aplicação interna, deixe-os vazios.
 
 Na página da aplicação humana, copie:
 
 - Team domain: `https://<team>.cloudflareaccess.com`.
 - Audience (AUD) da política.
-
-Guarde o Service Token ID e Secret para os secrets do GitHub na próxima etapa.
 
 ## 7. Configurar secrets e variables no Cloudflare Pages
 
@@ -146,9 +167,10 @@ No projeto Pages → Settings → Variables and Secrets → Production, adicione
 | Nome | Valor |
 |---|---|
 | `RUNNER_API_TOKEN` | Segredo aleatório com no mínimo 64 caracteres hexadecimais |
-| `TEAM_DOMAIN` | Team domain do Cloudflare Access |
-| `POLICY_AUD` | Audience da aplicação humana |
-| `ALLOWED_EMAILS` | Seu e-mail exato; para vários, separar por vírgula |
+| `SITE_PASSWORD` | Modo `password`: a senha do site (mínimo 12 caracteres) |
+| `TEAM_DOMAIN` | Só modo `access`: team domain do Cloudflare Access |
+| `POLICY_AUD` | Só modo `access`: Audience da aplicação humana |
+| `ALLOWED_EMAILS` | Só modo `access`: seu e-mail exato; para vários, separar por vírgula |
 
 `RUNNER_API_TOKEN` deve ser criado em um gerenciador de senhas ou gerador criptograficamente seguro. Não use a senha MEGA nem uma senha reutilizada. Use o mesmo valor no secret `COLLECTOR_API_TOKEN` do GitHub.
 
@@ -267,10 +289,11 @@ A automação revalida o título/tag, o ID individual, a duração da página e 
 ## 13. Verificação de produção
 
 - `https://<seu-projeto>.pages.dev/health` retorna status de saúde (se não for bloqueado pela policy humana na borda).
-- Abra o site autenticado com seu e-mail permitido.
+- Abra o site e entre (senha ou e-mail permitido, conforme o modo).
 - `/api/status` deve mostrar `copyAuthorized: false` antes da autorização; a faixa "Bloqueado/Liberado" da página segue esse valor.
 - `/api/catalog` não deve devolver `share_url` nem `storage_object_id`.
-- `/internal/collector` sem Access Service Token e Bearer token deve responder 401/403.
+- `/internal/collector` sem o Bearer token deve responder 401 (e, com a camada Access opcional, sem o Service Token também).
+- Sem login, `/api/status` e `/api/catalog` respondem 401 `authentication_required`; `/api/status` logado mostra `authMode`.
 - `/api/status` mostra `thumbnailStore` com o armazenamento ativo (`d1` ou `r2`). Se usar R2, o bucket deve continuar privado.
 - A palavra-chave está no secret `SEARCH_KEYWORD` (ou, sem secret, em `config/search-keyword.txt`).
 - Os workflows de CI precisam passar antes de qualquer mudança de produção.
@@ -321,8 +344,8 @@ Nunca edite a cópia de `COPY_AUTHORIZED` em `.env`, secret ou Pages variable: e
 ## 16. Repositório público: o que fica visível
 
 - **Visível a todos:** código, `COPY_AUTHORIZED`, workflows, `config/search-keyword.txt` e os **logs** das execuções. Os logs do runner imprimem apenas contagens, códigos de erro e identificadores internos aleatórios; nunca títulos, palavra-chave, URLs de vídeo ou links MEGA.
-- **Nunca no repositório:** tokens, senhas MEGA, Service Token do Access e `SEARCH_KEYWORD`. Eles vivem em Secrets do GitHub/Cloudflare e são mascarados nos logs.
+- **Nunca no repositório:** tokens, senhas MEGA, `SITE_PASSWORD`, o Service Token do Access (se usar) e `SEARCH_KEYWORD`. Eles vivem em Secrets do GitHub/Cloudflare e são mascarados nos logs.
 - **Mantenha `config/search-keyword.txt` vazio** e use o secret `SEARCH_KEYWORD`.
 - Em Settings → Actions → General → *Fork pull request workflows*, deixe a aprovação obrigatória para colaboradores externos. Os workflows de CI não usam nenhum secret.
-- O catálogo continua privado: o site e a API ficam atrás do Cloudflare Access; o código público não dá acesso aos dados.
+- O catálogo continua privado: a API exige a senha do site (ou o Cloudflare Access); o código público não dá acesso aos dados.
 - Se você não quiser expor nem o código, a alternativa é repositório privado, mas então os 2.000 minutos mensais não bastam para varrer a cada dez minutos.

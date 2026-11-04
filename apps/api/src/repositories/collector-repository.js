@@ -747,6 +747,10 @@ export class CollectorRepository {
         params: [cutoff, batchSize],
       },
       {
+        sql: `DELETE FROM auth_attempts WHERE window_start < ?`,
+        params: [new Date(Date.parse(now) - 86_400_000).toISOString()],
+      },
+      {
         sql: `DELETE FROM job_records
               WHERE id IN (
                 SELECT id FROM job_records
@@ -759,7 +763,7 @@ export class CollectorRepository {
       },
     ]);
     const changed = (index) => Number(results?.[index]?.meta?.changes ?? 0);
-    return { videos: changed(0), posts: changed(2), scans: changed(3), jobs: changed(4) };
+    return { videos: changed(0), posts: changed(2), scans: changed(3), jobs: changed(5) };
   }
 
   async failDeletion({ jobId, leaseToken, errorCode, attempts, now = new Date().toISOString() }) {

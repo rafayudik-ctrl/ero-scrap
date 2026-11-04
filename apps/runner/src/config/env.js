@@ -62,9 +62,9 @@ export function loadRunnerConfig(env = process.env) {
   if (Boolean(accessClientId) !== Boolean(accessClientSecret)) {
     throw new Error('CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET must be configured together.');
   }
-  if (appEnv === 'production' && (!accessClientId || !accessClientSecret)) {
-    throw new Error('Cloudflare Access service-token credentials are required in production.');
-  }
+  // The Access service token is optional: it is only needed when the site uses
+  // AUTH_MODE="access" and /internal/* sits behind a Zero Trust policy. The
+  // Bearer token below always protects the internal API.
 
   if (token.length < 32) {
     throw new Error('COLLECTOR_API_TOKEN must contain at least 32 characters.');

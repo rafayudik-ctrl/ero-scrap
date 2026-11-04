@@ -38,7 +38,7 @@ Defina o secret `SEARCH_KEYWORD` no GitHub (o valor é mascarado nos logs e não
 
 ## Implantação sem computador ligado
 
-Siga **[docs/CLOUD_DEPLOYMENT.md](docs/CLOUD_DEPLOYMENT.md)**. O guia cobre GitHub público, Cloudflare Pages Git Integration, D1 (R2 opcional), Cloudflare Access, secrets do GitHub, migrations, cron e teste em modo metadata.
+Siga **[docs/CLOUD_DEPLOYMENT.md](docs/CLOUD_DEPLOYMENT.md)**. O guia cobre GitHub público, Cloudflare Pages Git Integration, D1 (R2 opcional), senha do site (ou Cloudflare Access), secrets do GitHub, migrations, cron e teste em modo metadata.
 
 Resumo dos workflows:
 
@@ -61,7 +61,7 @@ Para desenvolvimento local, consulte [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Segurança e limites operacionais
 
-- Cloudflare Access protege a interface/API para o e-mail permitido; um Service Token protege `/internal/*`.
+- Acesso ao catálogo: senha do site com cookie assinado e limite de tentativas (padrão, `AUTH_MODE="password"`) ou Cloudflare Access (`AUTH_MODE="access"`). `/internal/*` exige sempre o Bearer token do executor.
 - A API interna exige também Bearer token próprio e só aceita comandos allowlisted; o runner nunca recebe token administrativo Cloudflare nem SQL.
 - Miniaturas privadas (D1 ou bucket R2 privado); URL MEGA não aparece no JSON público do catálogo.
 - 401/403, redirects e hosts fora da allowlist interrompem o downloader sem fallback de acesso; 429 é reagendado.

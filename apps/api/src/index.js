@@ -1,6 +1,8 @@
 import { isCopyAuthorized } from '../../../packages/config/src/security.js';
 import { APP_CONFIG } from '../../../packages/config/src/app.js';
-import { authenticateRequest } from './lib/access-auth.js';
+import { authenticateRequest } from './lib/auth.js';
+import { authMode } from './lib/password-auth.js';
+import { handleLogin, handleLogout } from './services/login.js';
 import { errorResponse, getCorsHeaders, jsonResponse } from './lib/http.js';
 import {
   getActiveThumbnailKey,
@@ -124,6 +126,8 @@ async function handleApi(request, env) {
 
   const openMatch = pathname.match(/^\/api\/catalog\/([a-f0-9]{32})\/open$/u);
   if (openMatch) return handleOpenItem(request, env, openMatch[1]);
+  if (pathname === '/api/login') return handleLogin(request, env);
+  if (pathname === '/api/logout') return handleLogout(request, env);
 
   if (request.method === 'OPTIONS') {
     const corsHeaders = getCorsHeaders(request, env);
@@ -161,6 +165,7 @@ async function handleApi(request, env) {
         mode: 'catalog-and-retention',
         copyAuthorized: isCopyAuthorized(),
         thumbnailStore: thumbnailBackend(env),
+        authMode: authMode(env),
         // Counters ride along so the page needs one request instead of two.
         stats,
         monitor: {

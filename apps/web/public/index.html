@@ -30,6 +30,7 @@
 
         <div class="topbar-actions">
           <span class="environment-label"><span class="status-dot" aria-hidden="true"></span> Ambiente privado</span>
+          <button class="text-button" id="logout-button" type="button" hidden>Sair</button>
           <button class="icon-button" id="theme-toggle" type="button" aria-label="Alternar tema" title="Alternar tema">
             <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
             <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5 8.5 8.5 0 1 0 20.5 15.5Z"/></svg>
@@ -38,6 +39,17 @@
       </header>
 
       <main id="main" class="main-content">
+        <section class="login-panel" id="login-panel" aria-labelledby="login-title" hidden>
+          <form id="login-form" class="login-form" autocomplete="on">
+            <h2 id="login-title">Entrar</h2>
+            <p>Este catálogo é privado. Digite a senha do site.</p>
+            <label for="login-password" class="visually-hidden">Senha</label>
+            <input id="login-password" name="password" type="password" autocomplete="current-password" minlength="12" maxlength="256" required>
+            <button class="open-video-button" type="submit" id="login-submit">Entrar</button>
+            <p class="login-error" id="login-error" role="alert" hidden></p>
+          </form>
+        </section>
+
         <section class="intro" aria-labelledby="page-title">
           <div class="intro-copy">
             <p class="eyebrow">Sua biblioteca privada</p>

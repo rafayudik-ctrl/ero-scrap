@@ -38,6 +38,8 @@ test('runner config rejects missing and malformed collector credentials', () => 
   assert.throws(() => loadRunnerConfig({ ...validEnv, CF_ACCESS_CLIENT_SECRET: '' }), /configured together/);
   const local = loadRunnerConfig({ ...validEnv, APP_ENV: 'development', CF_ACCESS_CLIENT_ID: '', CF_ACCESS_CLIENT_SECRET: '' });
   assert.equal(local.accessClientId, null);
+  const passwordMode = loadRunnerConfig({ ...validEnv, CF_ACCESS_CLIENT_ID: '', CF_ACCESS_CLIENT_SECRET: '' });
+  assert.equal(passwordMode.accessClientId, null, 'production works without an Access service token (password mode)');
   assert.throws(() => loadRunnerConfig({ ...validEnv, COLLECTOR_API_URL: 'https://api.example.test/anything' }), /end exactly/);
 });
 

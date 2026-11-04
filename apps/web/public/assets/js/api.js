@@ -72,3 +72,30 @@ export function resolveApiAssetUrl(path) {
   if (typeof path !== 'string' || !path.startsWith('/api/thumbnails/')) return null;
   return `${API_BASE_URL}${path}`;
 }
+
+async function post(path, body) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body ?? {}),
+    cache: 'no-store',
+  });
+  let payload = null;
+  try { payload = await response.json(); } catch { /* handled below */ }
+  if (!response.ok) {
+    const error = new Error(payload?.error?.message || `Falha na API (${response.status}).`);
+    error.status = response.status;
+    error.code = payload?.error?.code || 'request_failed';
+    throw error;
+  }
+  return payload;
+}
+
+export function login(password) {
+  return post('/api/login', { password });
+}
+
+export function logout() {
+  return post('/api/logout', {});
+}

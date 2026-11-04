@@ -8,7 +8,10 @@
     "WEB_ORIGIN": "https://ero-scrap.pages.dev",
     // Where thumbnails are kept. "d1" needs nothing else (default, no credit card).
     // To use R2 instead: change this to "r2" AND enable the r2_buckets line below.
-    "THUMBNAIL_STORE": "d1"
+    "THUMBNAIL_STORE": "d1",
+    // Who may open the site. "password" (default) uses the SITE_PASSWORD secret: no extra
+    // service, no credit card. "access" uses Cloudflare Zero Trust (see docs/CLOUD_DEPLOYMENT.md).
+    "AUTH_MODE": "password"
   },
   "d1_databases": [
     {
