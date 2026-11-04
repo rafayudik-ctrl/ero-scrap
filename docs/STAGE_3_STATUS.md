@@ -1,4 +1,4 @@
-# Estado atual — Ero-Scrap 0.4.5
+# Estado atual — Ero-Scrap 0.4.6
 
 ## Entregue em código
 

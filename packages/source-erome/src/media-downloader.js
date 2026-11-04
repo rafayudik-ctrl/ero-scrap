@@ -10,7 +10,7 @@ import { classifyMediaUrl, normalizeAlbumUrl } from './normalizers.js';
 
 const ASSET_ID_PATTERN = /^[a-f0-9]{32}$/u;
 const ALLOWED_EXTENSIONS = new Set(['.mp4', '.m4v', '.mov', '.webm', '.ogv']);
-const USER_AGENT = 'Ero-Scrap/0.4.5 (public media URL; authorized transfers only)';
+const USER_AGENT = 'Ero-Scrap/0.4.6 (public media URL; authorized transfers only)';
 
 export class EromeDownloadError extends Error {
   constructor(code, message, options = {}) {

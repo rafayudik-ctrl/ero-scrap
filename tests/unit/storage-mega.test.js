@@ -175,3 +175,33 @@ test('MEGA deletion revokes sharing best-effort and removes only the exact file'
   assert.deepEqual(commands.map(({ command }) => command), ['ls', 'export', 'rm']);
   assert.deepEqual(commands[2].args, ['-f', `/Ero-Scrap/${ASSET_ID}/authorized-sample.mp4`]);
 });
+
+test('MEGAcmd wording "Couldn\'t find" counts as a missing file, so the first upload proceeds', async () => {
+  await withVideoFile(async (localPath) => {
+    const commands = [];
+    const provider = new MegaCmdStorageProvider({
+      authorizeCopy: () => {},
+      runCommand: async (command, args) => {
+        commands.push(command);
+        if (command === 'ls' && commands.filter((name) => name === 'ls').length === 1) {
+          throw Object.assign(new Error('failed'), { code: 'mega_command_failed', stderr: "[err: 2026] Couldn't find /Ero-Scrap/x/authorized-sample.mp4" });
+        }
+        if (command === 'export') return { stdout: 'Exported link: https://mega.nz/file/AbCdEf#secretKey', stderr: '', exitCode: 0 };
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+    });
+    const result = await provider.uploadLocalFile({ assetId: ASSET_ID, localPath });
+    assert.equal(result.reusedExisting, false);
+    assert.deepEqual(commands.slice(0, 3), ['ls', 'mkdir', 'put']);
+  });
+});
+
+test('an authentication failure is never mistaken for a missing file', async () => {
+  await withVideoFile(async (localPath) => {
+    const provider = new MegaCmdStorageProvider({
+      authorizeCopy: () => {},
+      runCommand: async () => { throw Object.assign(new Error('failed'), { code: 'mega_command_failed', stderr: 'Not logged in.' }); },
+    });
+    await assert.rejects(provider.uploadLocalFile({ assetId: ASSET_ID, localPath }), /failed/);
+  });
+});

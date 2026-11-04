@@ -184,6 +184,8 @@ export class EromeMediaProcessingService {
         this.#logger.error?.('[ero-scrap] Erome media processing failed', {
           assetId: job.assetId,
           errorCode,
+          // Which MEGAcmd step failed (name and exit code only, never its output).
+          ...(typeof error?.command === 'string' ? { megaCommand: error.command, exitCode: error.exitCode ?? null } : {}),
           attempt: job.attempts,
           dead: Boolean(outcome.dead),
         });

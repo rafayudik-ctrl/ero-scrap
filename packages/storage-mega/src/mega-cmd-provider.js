@@ -47,7 +47,7 @@ function validateAssetId(value) {
 
 function isMissingRemoteObject(error) {
   const diagnostic = `${error?.stdout ?? ''} ${error?.stderr ?? ''}`.toLowerCase();
-  return /(?:not found|no such (?:file|path)|does not exist|doesn't exist|enoent)/u.test(diagnostic);
+  return /(?:not found|couldn'?t find|could not find|cannot find|no such (?:file|path)|does not exist|doesn'?t exist|enoent)/u.test(diagnostic);
 }
 
 
