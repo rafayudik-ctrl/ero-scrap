@@ -14,7 +14,7 @@
     {
       "binding": "DB",
       "database_name": "ero-scrap-db",
-      "database_id": "00000000-0000-4000-8000-000000000001",
+      "database_id": "5140600e-42b8-44b1-ac9d-acdbd1e1d4dd",
       "migrations_dir": "database/migrations"
     }
   ],
