@@ -205,3 +205,22 @@ test('an authentication failure is never mistaken for a missing file', async () 
     await assert.rejects(provider.uploadLocalFile({ assetId: ASSET_ID, localPath }), /failed/);
   });
 });
+
+test('a hung quick MEGAcmd step times out on its own short limit while put keeps the long one', async () => {
+  const { createMegaCommandRunner } = await import('../../packages/storage-mega/src/command-runner.js');
+  const { EventEmitter } = await import('node:events');
+  const fakeSpawn = () => {
+    const child = new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.kill = () => queueMicrotask(() => child.emit('close', null));
+    return child; // never finishes by itself
+  };
+  const run = createMegaCommandRunner({ platform: 'linux', spawnImpl: fakeSpawn, timeoutMs: 5_000, commandTimeoutsMs: { export: 30, put: 5_000 } });
+  const started = Date.now();
+  const keepAlive = setInterval(() => {}, 1_000); // the runner's own timer is unref'd
+  try {
+    await assert.rejects(run('export', ['-a', '-f', '/x']), (error) => error.code === 'mega_timeout' && error.command === 'export');
+  } finally { clearInterval(keepAlive); }
+  assert.ok(Date.now() - started < 2_000, 'did not wait for the long limit');
+});

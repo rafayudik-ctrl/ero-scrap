@@ -37,6 +37,7 @@ export function createMegaCommandRunner({
   platform = process.platform,
   spawnImpl = spawn,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  commandTimeoutsMs = {},
   maxOutputBytes = DEFAULT_MAX_OUTPUT_BYTES,
   powershellBridge = POWERSHELL_BRIDGE,
 } = {}) {
@@ -106,7 +107,7 @@ export function createMegaCommandRunner({
       const timer = setTimeout(() => {
         timedOut = true;
         child.kill('SIGKILL');
-      }, timeoutMs);
+      }, commandTimeoutsMs[command] ?? timeoutMs);
       timer.unref?.();
 
       child.on('close', (exitCode) => {

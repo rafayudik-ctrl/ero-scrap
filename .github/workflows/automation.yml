@@ -158,6 +158,8 @@ jobs:
 
       - name: Process one queued video and enforce retention
         if: steps.plan.outputs.process == 'true'
+        # Fails with a clear error and still lets the MEGA logout step run.
+        timeout-minutes: 35
         run: node apps/runner/src/index.js --process-once
 
       - name: Run retention cleanup

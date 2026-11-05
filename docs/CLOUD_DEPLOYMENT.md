@@ -37,7 +37,7 @@ O site não baixa nem reproduz vídeos no navegador. A página recebe metadados 
 - Abra o terminal integrado do Codespaces e execute:
 
 ```bash
-unzip -q ero-scrap-cloud-runner-v0.4.6.zip -d /tmp/ero-scrap-release
+unzip -q ero-scrap-cloud-runner-v0.4.7.zip -d /tmp/ero-scrap-release
 cp -a /tmp/ero-scrap-release/. .
 rm -rf /tmp/ero-scrap-release
 git status --short

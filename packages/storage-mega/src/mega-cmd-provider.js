@@ -61,7 +61,12 @@ export class MegaCmdStorageProvider {
     if ((runCommand !== undefined && typeof runCommand !== 'function') || typeof authorizeCopy !== 'function' || typeof now !== 'function') {
       throw new TypeError('MEGA provider dependencies must be functions.');
     }
-    this.#run = runCommand ?? createMegaCommandRunner({ timeoutMs });
+    this.#run = runCommand ?? createMegaCommandRunner({
+      timeoutMs,
+      // Only the transfer may take long. Every other step is a quick metadata call;
+      // a hung one must fail in a minute instead of holding the whole job.
+      commandTimeoutsMs: { put: timeoutMs, ls: 60_000, mkdir: 60_000, export: 60_000, rm: 60_000, whoami: 60_000 },
+    });
     this.#remoteRoot = normalizeRemoteRoot(remoteRoot);
     this.#authorizeCopy = authorizeCopy;
     this.#now = now;
@@ -104,7 +109,7 @@ export class MegaCmdStorageProvider {
     // exact existing object instead of uploading a duplicate or failing dead.
     try {
       const existing = await this.#run('ls', ['--show-handles', remoteObjectId]);
-      const exported = await this.#run('export', ['-a', remoteObjectId]);
+      const exported = await this.#run('export', ['-a', '-f', remoteObjectId]);
       const existingShareUrl = parseShareUrl(`${exported.stdout}\n${exported.stderr}`);
       return Object.freeze({
         provider: 'mega',
@@ -125,7 +130,7 @@ export class MegaCmdStorageProvider {
     try {
       await this.#run('put', [absolutePath, remoteDirectory]);
       verification = await this.#run('ls', ['--show-handles', remoteObjectId]);
-      const exportResult = await this.#run('export', ['-a', remoteObjectId]);
+      const exportResult = await this.#run('export', ['-a', '-f', remoteObjectId]);
       shareUrl = parseShareUrl(`${exportResult.stdout}\n${exportResult.stderr}`);
     } catch (rawError) {
       const error = rawError instanceof Error

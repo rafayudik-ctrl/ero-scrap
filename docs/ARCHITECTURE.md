@@ -1,4 +1,4 @@
-# Arquitetura atual — Ero-Scrap 0.4.6
+# Arquitetura atual — Ero-Scrap 0.4.7
 
 ## Objetivo
 
