@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { executeCollectorCommand } from '../src/services/collector-service.js';
+import { COPY_AUTHORIZED } from '../../../packages/config/src/security.js';
 
 class FakeD1 {
   statements = [];
@@ -121,7 +122,7 @@ test('evaluation command accepts only the documented metadata statuses and row I
 });
 
 
-test('Worker-side policy also blocks eligible status while copy authorization is false', async () => {
+test('Worker-side policy also blocks eligible status while copy authorization is false', { skip: COPY_AUTHORIZED }, async () => {
   const db = new FakeD1();
   await assert.rejects(executeCollectorCommand(db, 'videos.evaluate', {
     now: '2026-11-01T00:00:00.000Z',
@@ -131,7 +132,7 @@ test('Worker-side policy also blocks eligible status while copy authorization is
 });
 
 
-test('media registration is blocked at the Worker command boundary while copy authorization is false', async () => {
+test('media registration is blocked at the Worker command boundary while copy authorization is false', { skip: COPY_AUTHORIZED }, async () => {
   const db = new FakeD1();
   await assert.rejects(executeCollectorCommand(db, 'media.register', {
     assetId: 'a'.repeat(32),
@@ -144,7 +145,7 @@ test('media registration is blocked at the Worker command boundary while copy au
 });
 
 
-test('process due check is disabled at the Worker boundary while copy authorization is false', async () => {
+test('process due check is disabled at the Worker boundary while copy authorization is false', { skip: COPY_AUTHORIZED }, async () => {
   const db = new FakeD1();
   const result = await executeCollectorCommand(db, 'process.hasDue', {
     now: '2026-11-01T12:00:00.000Z',

@@ -1,4 +1,4 @@
-# Arquitetura atual — Ero-Scrap 0.4.7
+# Arquitetura atual — Ero-Scrap 0.4.10
 
 ## Objetivo
 
@@ -87,7 +87,7 @@ MEGAcmd oficial é executado com `spawn`, `shell: false`, argumentos separados, 
 ### Descoberta
 
 ```text
-GitHub Actions (cada 10 min)
+GitHub Actions (cada 20 min)
   -> ler config/search-keyword.txt
   -> GET New page 1 e page 2 (sem página 3+)
   -> upsert dos posts
@@ -124,7 +124,7 @@ Browser autenticado
   -> expires_at = first_clicked_at + 24 h
   -> 303 para o link MEGA
 
-GitHub Actions (mesmo job de 10 min; também no modo full)
+GitHub Actions (mesmo job de 20 min; também no modo full)
   -> consultar D1 se há exclusões vencidas
   -> se houver, autenticar MEGA e reclamar exclusões com lease
   -> apagar arquivo exato no MEGA

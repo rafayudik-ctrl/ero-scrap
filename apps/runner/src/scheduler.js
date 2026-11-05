@@ -9,7 +9,7 @@ import { performance } from 'node:perf_hooks';
  */
 export async function startScheduler({
   scanOnce,
-  intervalMs = 600_000,
+  intervalMs = 1_200_000,
   logger = console,
   signal,
   clock = () => performance.now(),

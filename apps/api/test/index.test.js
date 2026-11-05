@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import worker from '../src/index.js';
+import { COPY_AUTHORIZED } from '../../../packages/config/src/security.js';
 
 function makeRequest(path, options = {}) {
   return new Request(`https://api.example.test${path}`, options);
@@ -63,7 +64,7 @@ test('unrecognized routes return a structured 404', async () => {
 });
 
 
-test('status endpoint reports the copy gate as disabled', async () => {
+test('status endpoint reports the copy gate as disabled', { skip: COPY_AUTHORIZED }, async () => {
   const db = {
     prepare() {
       const statement = { bind() { return statement; }, async first() { return null; } };

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import worker from '../../apps/api/src/index.js';
+import { COPY_AUTHORIZED } from '../../packages/config/src/security.js';
 import { createSqliteD1 } from '../helpers/sqlite-d1.js';
 import {
   authMode, createSessionToken, passwordConfigured, passwordMatches, verifySessionToken, SESSION_SECONDS,
@@ -60,7 +61,7 @@ test('login sets a hardened cookie that unlocks the API, and logout clears it', 
     assert.equal(status.status, 200);
     const payload = await status.json();
     assert.equal(payload.authMode, 'password');
-    assert.equal(payload.copyAuthorized, false);
+    assert.equal(payload.copyAuthorized, COPY_AUTHORIZED);
 
     const out = await worker.fetch(new Request(`${ORIGIN}/api/logout`, { method: 'POST', headers: { Origin: ORIGIN } }), env);
     assert.match(out.headers.get('set-cookie'), /Max-Age=0/u);

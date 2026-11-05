@@ -349,3 +349,19 @@ Nunca edite a cópia de `COPY_AUTHORIZED` em `.env`, secret ou Pages variable: e
 - Em Settings → Actions → General → *Fork pull request workflows*, deixe a aprovação obrigatória para colaboradores externos. Os workflows de CI não usam nenhum secret.
 - O catálogo continua privado: a API exige a senha do site (ou o Cloudflare Access); o código público não dá acesso aos dados.
 - Se você não quiser expor nem o código, a alternativa é repositório privado, mas então os 2.000 minutos mensais não bastam para varrer a cada dez minutos.
+
+## 17. Frequência e gatilho externo opcional
+
+O workflow roda a cada 20 minutos (`7,27,47 * * * *`). O agendador do GitHub (`schedule`) **não garante horário**: em horários de pico ele atrasa ou descarta execuções, e isso é pior em repositórios com pouca atividade. Ver só 3 execuções em 12 horas é um caso comum.
+
+Se quiser regularidade real, sem cartão e sem código novo, use um agendador externo grátis para disparar o workflow pela API do GitHub. O `schedule` continua como reserva.
+
+1. GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate. Repositório: só este. Permissão: **Actions: Read and write**. Validade: 1 ano.
+2. Em https://cron-job.org (grátis, sem cartão) crie um cron job a cada 20 minutos:
+   - URL: `https://api.github.com/repos/SEU_USUARIO/SEU_REPO/actions/workflows/automation.yml/dispatches`
+   - Método: `POST`
+   - Cabeçalhos: `Authorization: Bearer SEU_TOKEN`, `Accept: application/vnd.github+json`, `User-Agent: ero-scrap`
+   - Corpo: `{"ref":"main","inputs":{"mode":"auto"}}`
+3. Resposta esperada: `204`. O token só dispara workflows deste repositório e nunca vai para o código.
+
+Os grupos de concorrência (`ero-scrap-scan`, `ero-scrap-storage`) já impedem execuções sobrepostas, então um disparo duplicado do GitHub e do agendador externo não causa trabalho duplicado.

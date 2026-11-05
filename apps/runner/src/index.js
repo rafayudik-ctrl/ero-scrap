@@ -103,7 +103,7 @@ retention_due=${retentionDue}
 
   if (process.argv.includes('--process-once')) {
     if (!isCopyAuthorized()) throw new Error('Video processing is blocked while COPY_AUTHORIZED is false.');
-    await runner.mediaProcessingService.runOnce();
+    await runner.mediaProcessingService.runBatch();
     await runner.retentionService.runOnce();
     await runner.maintenanceService.runIfDue();
     return;

@@ -62,6 +62,40 @@ export class EromeMediaProcessingService {
     this.#maxJobs = maxJobs;
   }
 
+  /**
+   * Processes up to `maxVideos` queued videos one after another. Each pass
+   * claims a single job, so only one file is ever on disk and in memory, and a
+   * job is never leased long before it is actually worked on. It stops early
+   * when the queue is empty, when the time budget for starting a new video is
+   * spent, or after two failures in a row (a systemic problem such as MEGA
+   * being down would only repeat).
+   */
+  async runBatch({
+    maxVideos = APP_CONFIG.media.maxVideosPerRun,
+    startBudgetMs = APP_CONFIG.media.startBudgetMs,
+    clock = () => Date.now(),
+  } = {}) {
+    if (!Number.isInteger(maxVideos) || maxVideos < 1 || maxVideos > 10) throw new RangeError('maxVideos must be between 1 and 10.');
+    const total = { claimed: 0, stored: 0, retried: 0, dead: 0, stale: 0, passes: 0 };
+    const startedAt = clock();
+    let consecutiveFailures = 0;
+    for (let pass = 0; pass < maxVideos; pass += 1) {
+      if (pass > 0 && clock() - startedAt >= startBudgetMs) {
+        total.stoppedBy = 'time_budget';
+        break;
+      }
+      const result = await this.runOnce();
+      if (result.skipped) { total.stoppedBy = result.skipped; break; }
+      total.passes += 1;
+      for (const key of ['claimed', 'stored', 'retried', 'dead', 'stale']) total[key] += result[key];
+      if (result.claimed === 0) { total.stoppedBy = 'queue_empty'; break; }
+      consecutiveFailures = result.stored > 0 ? 0 : consecutiveFailures + 1;
+      if (consecutiveFailures >= 2) { total.stoppedBy = 'repeated_failures'; break; }
+    }
+    this.#logger.info?.('[ero-scrap] Erome media batch completed', total);
+    return total;
+  }
+
   async runOnce() {
     // This is deliberately the first operation: with the hard gate closed, the
     // service does not claim jobs, fetch album pages, or request media bytes.

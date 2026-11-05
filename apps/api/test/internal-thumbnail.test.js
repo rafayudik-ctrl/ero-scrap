@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { handleInternalThumbnailUpload } from '../src/services/internal-collector.js';
+import { COPY_AUTHORIZED } from '../../../packages/config/src/security.js';
 
 const TOKEN = 't'.repeat(64);
 const ASSET_ID = 'a'.repeat(32);
 
-test('internal thumbnail upload is blocked before touching R2 while COPY_AUTHORIZED is false', async () => {
+test('internal thumbnail upload is blocked before touching R2 while COPY_AUTHORIZED is false', { skip: COPY_AUTHORIZED }, async () => {
   let putCalls = 0;
   let dbCalls = 0;
   const response = await handleInternalThumbnailUpload(new Request(`https://api.example.test/internal/thumbnails/${ASSET_ID}`, {

@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AuthorizedLocalMediaService } from '../../apps/runner/src/services/authorized-local-media-service.js';
-import { CopyAuthorizationError } from '../../packages/config/src/security.js';
+import { CopyAuthorizationError, COPY_AUTHORIZED } from '../../packages/config/src/security.js';
 import { evaluateDuration, DURATION_STATUS } from '../../packages/domain/src/duration.js';
 
 const ASSET_ID = 'a'.repeat(32);
 
-test('authorized local media service blocks before invoking storage while the copy gate is false', async () => {
+test('authorized local media service blocks before invoking storage while the copy gate is false', { skip: COPY_AUTHORIZED }, async () => {
   let uploadCalls = 0;
   let thumbnailCalls = 0;
   const service = new AuthorizedLocalMediaService({

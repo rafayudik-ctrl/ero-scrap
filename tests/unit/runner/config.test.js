@@ -13,7 +13,7 @@ const validEnv = {
 test('runner config uses the fixed keyword file and does not accept an env override', () => {
   const config = loadRunnerConfig({ ...validEnv, SEARCH_KEYWORD_FILE: '/tmp/other-keyword.txt' });
   assert.match(config.keywordFilePath, /config[\\/]search-keyword\.txt$/u);
-  assert.equal(config.scanIntervalMs, 600_000);
+  assert.equal(config.scanIntervalMs, 1_200_000);
   assert.equal(config.maxPostInspectionsPerRun, 160);
   assert.equal(config.collectorApiUrl, validEnv.COLLECTOR_API_URL);
   assert.equal(config.accessClientId, 'access-id');

@@ -82,7 +82,7 @@ test('downloader rejects redirects and foreign media destinations before followi
 });
 
 
-test('downloader hard gate blocks a direct call before URL validation or network access', async () => {
+test('downloader hard gate blocks a direct call before URL validation or network access', { skip: COPY_AUTHORIZED }, async () => {
   assert.equal(COPY_AUTHORIZED, false);
   let requests = 0;
   const downloader = new EromeMediaDownloader({

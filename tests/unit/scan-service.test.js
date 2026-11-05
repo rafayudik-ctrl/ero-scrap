@@ -118,6 +118,9 @@ async function withKeyword(contents, run) {
   }
 }
 
+// A matching, short-enough video is 'eligible' when the gate is open and 'copy_blocked' when closed.
+const CANDIDATE = COPY_AUTHORIZED ? 'eligible' : 'copy_blocked';
+
 test('scan checks only New pages 1 and 2 and matches title OR tags', async () => {
   await withKeyword('needle', async (keywordFilePath) => {
     const fetchedPages = [];
@@ -155,14 +158,13 @@ test('scan checks only New pages 1 and 2 and matches title OR tags', async () =>
     assert.equal(result.videoCandidates, 2); // Exactly 10:00 and 09:59.
     assert.equal(result.videosTooLong, 1);
     assert.equal(result.videosWithUnknownDuration, 1);
-    assert.equal(result.mediaCopyPerformed, false);
-    assert.equal(COPY_AUTHORIZED, false);
+    assert.equal(result.mediaCopyPerformed, false); // The scan never copies media itself.
 
     const statuses = new Map(repository.evaluations.map((item) => [item.id, item.status]));
-    assert.equal(statuses.get('Title1234-video-0'), 'copy_blocked');
+    assert.equal(statuses.get('Title1234-video-0'), CANDIDATE);
     assert.equal(statuses.get('Title1234-video-1'), 'too_long');
     assert.equal(statuses.get('Title1234-video-2'), 'duration_unknown');
-    assert.equal(statuses.get('Tagg5678-video-0'), 'copy_blocked');
+    assert.equal(statuses.get('Tagg5678-video-0'), CANDIDATE);
     assert.equal(statuses.get('Other1234-video-0'), 'ignored');
     assert.equal(repository.details.get('ImgOnly1').videos.length, 0);
     assert.equal(result.status, 'succeeded');
@@ -204,12 +206,12 @@ test('keyword is reloaded from the same file at each run', async () => {
     };
     const service = new ScanService({ sourceClient, repository, keywordFilePath, logger: { info() {} } });
     await service.runOnce();
-    const firstCandidates = repository.evaluations.filter((item) => item.status === 'copy_blocked').length;
+    const firstCandidates = repository.evaluations.filter((item) => item.status === CANDIDATE).length;
 
     await writeFile(keywordFilePath, 'ordinary', 'utf8');
     await service.runOnce();
     const latestStatuses = new Map(repository.evaluations.map((item) => [item.id, item.status]));
-    const latestCandidates = [...latestStatuses.values()].filter((status) => status === 'copy_blocked').length;
+    const latestCandidates = [...latestStatuses.values()].filter((status) => status === CANDIDATE).length;
 
     assert.ok(firstCandidates > 0);
     assert.equal(latestCandidates, 1); // The tag/title match changes without a restart.
@@ -252,8 +254,8 @@ test('scan sends only evaluations that change a video status', async () => {
     repository.getPostSnapshots = async () => [{
       id: 'AAAA1111', title: 'needle post', tags: [], details_checked_at: '2026-11-01T00:00:00.000Z',
       videos: [
-        { id: 'v-unchanged', duration_ms: 30_000, status: 'copy_blocked' },
-        { id: 'v-changed', duration_ms: 900_000, status: 'copy_blocked' },
+        { id: 'v-unchanged', duration_ms: 30_000, status: CANDIDATE },
+        { id: 'v-changed', duration_ms: 900_000, status: CANDIDATE },
         { id: 'v-stored', duration_ms: 30_000, status: 'stored' },
         { id: 'v-clicked', duration_ms: 900_000, status: 'clicked' },
         { id: 'v-processing', duration_ms: 30_000, status: 'processing' },

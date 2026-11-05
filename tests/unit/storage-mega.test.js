@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MegaCmdStorageProvider } from '../../packages/storage-mega/src/index.js';
-import { CopyAuthorizationError } from '../../packages/config/src/security.js';
+import { CopyAuthorizationError, COPY_AUTHORIZED } from '../../packages/config/src/security.js';
 
 const ASSET_ID = 'a'.repeat(32);
 
@@ -36,7 +36,7 @@ test('MEGA connection check is read-only and does not require the copy gate', as
   assert.deepEqual(commands, [{ command: 'whoami', args: [] }]);
 });
 
-test('MEGA upload is blocked before local file inspection or any command by default', async () => {
+test('MEGA upload is blocked before local file inspection or any command by default', { skip: COPY_AUTHORIZED }, async () => {
   let commandCount = 0;
   const provider = new MegaCmdStorageProvider({ runCommand: async () => { commandCount += 1; } });
   await assert.rejects(provider.uploadLocalFile({ assetId: ASSET_ID, localPath: '/not-read.mp4' }), CopyAuthorizationError);

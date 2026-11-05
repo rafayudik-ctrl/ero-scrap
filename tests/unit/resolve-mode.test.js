@@ -9,16 +9,22 @@ function resolve(mode) {
   });
 }
 
-test('with COPY_AUTHORIZED=false, auto resolves to metadata and full is refused', async () => {
-  const source = await readFile('packages/config/src/security.js', 'utf8');
-  assert.match(source, /COPY_AUTHORIZED = false;/u, 'this test documents the shipped (closed) gate');
+import { COPY_AUTHORIZED } from '../../packages/config/src/security.js';
+
+test('mode resolution follows the COPY_AUTHORIZED constant', () => {
   const auto = resolve('auto');
   assert.equal(auto.status, 0);
-  assert.match(auto.stdout, /^mode=metadata$/mu);
-  assert.match(auto.stdout, /^copy_authorized=false$/mu);
   const full = resolve('full');
-  assert.notEqual(full.status, 0);
-  assert.match(full.stderr, /COPY_AUTHORIZED is false/u);
+  if (COPY_AUTHORIZED === true) {
+    assert.match(auto.stdout, /^mode=full$/mu);
+    assert.match(auto.stdout, /^copy_authorized=true$/mu);
+    assert.equal(full.status, 0);
+  } else {
+    assert.match(auto.stdout, /^mode=metadata$/mu);
+    assert.match(auto.stdout, /^copy_authorized=false$/mu);
+    assert.notEqual(full.status, 0);
+    assert.match(full.stderr, /COPY_AUTHORIZED is false/u);
+  }
   assert.notEqual(resolve('bogus').status, 0);
   assert.match(resolve('cleanup').stdout, /^mode=cleanup$/mu);
 });

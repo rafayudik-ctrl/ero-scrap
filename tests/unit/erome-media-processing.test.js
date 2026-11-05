@@ -40,7 +40,7 @@ async function withWorkspace(run) {
   }
 }
 
-test('media processing hard gate stops before claiming jobs or requesting album/media bytes', async () => {
+test('media processing hard gate stops before claiming jobs or requesting album/media bytes', { skip: COPY_AUTHORIZED }, async () => {
   assert.equal(COPY_AUTHORIZED, false);
   let claimed = 0;
   let sourceCalls = 0;
@@ -106,5 +106,63 @@ test('authorized processing revalidates keyword/duration, downloads one exact vi
     assert.deepEqual(calls.thumbnails[0].bytes, await readFile(thumbnailPath));
     assert.equal(calls.cleanedDownload, 1);
     assert.equal(calls.cleanedThumbnail, 1);
+  });
+});
+
+test('runBatch stores jobs one at a time and stops when the queue is empty', async () => {
+  await withWorkspace(async ({ keywordFilePath, localPath, thumbnailPath }) => {
+    const limits = [];
+    let queue = 3;
+    let completed = 0;
+    const service = new EromeMediaProcessingService({
+      repository: {
+        async claimProcessVideoJobs(args) { limits.push(args.limit); return queue-- > 0 ? [JOB] : []; },
+        async completeProcessVideoJob() { completed += 1; },
+        async failProcessVideoJob(record) { throw new Error(`Unexpected failure: ${record.errorCode}`); },
+        async uploadThumbnail() {},
+      },
+      sourceClient: { async fetchAlbum() { return ALBUM_HTML; } },
+      downloader: { async download() { return { localPath, sizeBytes: 16, async cleanup() {} }; } },
+      mediaInspector: { async inspect() { return { durationMs: 599_000 }; } },
+      thumbnailGenerator: { async generate() { return { path: thumbnailPath, async cleanup() {} }; } },
+      storage: { async uploadLocalFile() { return { objectId: '/Ero-Scrap/x/video.mp4', shareUrl: 'https://mega.nz/file/AbCdEf#k', uploadedAt: '2026-11-01T12:00:00.000Z' }; } },
+      keywordFilePath, logger: { info() {}, warn() {}, error() {} }, authorizeCopy() {},
+    });
+    const result = await service.runBatch({ maxVideos: 4 });
+    assert.equal(completed, 3);
+    assert.equal(result.stored, 3);
+    assert.equal(result.stoppedBy, 'queue_empty');
+    assert.deepEqual(limits, [1, 1, 1, 1]);
+  });
+});
+
+test('runBatch limits, budget and consecutive-failure stop', async () => {
+  await withWorkspace(async ({ keywordFilePath }) => {
+    let claimed = 0;
+    const make = (failing) => new EromeMediaProcessingService({
+      repository: {
+        async claimProcessVideoJobs(args) { assert.equal(args.limit, 1); claimed += 1; return [JOB]; },
+        async completeProcessVideoJob() {}, async uploadThumbnail() {},
+        async failProcessVideoJob() { return { retry: true, dead: false, stale: false }; },
+      },
+      sourceClient: { async fetchAlbum() { if (failing) throw Object.assign(new Error('x'), { code: 'source_video_missing' }); return ALBUM_HTML; } },
+      downloader: { async download() { throw Object.assign(new Error('x'), { code: 'media_download_failed' }); } },
+      mediaInspector: { async inspect() {} }, thumbnailGenerator: { async generate() {} }, storage: { async uploadLocalFile() {} },
+      keywordFilePath, logger: { info() {}, warn() {}, error() {} }, authorizeCopy() {},
+    });
+
+    // Two failures in a row stop the batch even though 4 were allowed.
+    let result = await make(true).runBatch({ maxVideos: 4 });
+    assert.equal(result.stoppedBy, 'repeated_failures');
+    assert.equal(result.claimed, 2);
+
+    // The time budget only blocks starting a *new* video, never the first.
+    claimed = 0;
+    let t = 0;
+    result = await make(true).runBatch({ maxVideos: 4, startBudgetMs: 1000, clock: () => (t += 2000) });
+    assert.equal(result.stoppedBy, 'time_budget');
+    assert.equal(claimed, 1);
+
+    await assert.rejects(make(true).runBatch({ maxVideos: 0 }), RangeError);
   });
 });

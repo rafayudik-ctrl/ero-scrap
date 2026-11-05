@@ -23,7 +23,7 @@
 - [x] IDs estáveis por vídeo; título não é usado como chave de deduplicação.
 - [x] D1 acessado pelo Worker via comandos allowlisted e SQL parametrizado; runner não possui token administrativo Cloudflare/D1.
 - [x] API interna exige token próprio, limita tamanho do corpo e valida todos os comandos/payloads.
-- [x] Runner Node.js possui execução única e scheduler de 10 minutos sem sobreposição.
+- [x] Runner Node.js possui execução única e scheduler de 20 minutos sem sobreposição.
 - [x] Palavra-chave pode ser alterada no mesmo arquivo sem reiniciar o processo; os posts já inspecionados que continuam nas duas páginas são reavaliados com o termo novo.
 - [x] Trava de cópia `COPY_AUTHORIZED = false` no domínio e também no Worker: o Worker rejeita status `eligible` enquanto a trava estiver fechada.
 

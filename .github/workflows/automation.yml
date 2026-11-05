@@ -2,14 +2,15 @@ name: Ero-Scrap automation
 
 # Two independent jobs so a long video download never delays the next scan:
 #   scan    - reads the "New" tab (about 1 minute, no MEGA, no dependencies).
-#   storage - processes at most one queued video and enforces retention. It only
+#   storage - processes up to 4 queued videos (one at a time) and enforces retention. It only
 #             installs FFmpeg/MEGAcmd when there is real work to do.
 # The repository is meant to be public: Actions minutes are unlimited there.
 
 on:
   schedule:
-    # Every ten minutes, deliberately offset from the top of the hour.
-    - cron: '7,17,27,37,47,57 * * * *'
+    # Every 20 minutes, deliberately offset from the top of the hour (GitHub drops
+    # or delays schedules at :00 and :30 when its queue is busy).
+    - cron: '7,27,47 * * * *'
   workflow_dispatch:
     inputs:
       mode:
@@ -60,7 +61,7 @@ jobs:
         run: node apps/runner/src/index.js --scan-only
 
   storage:
-    name: Process one queued video and enforce retention
+    name: Process up to 4 queued videos and enforce retention
     needs: scan
     # A skipped or failed scan must never block retention or video processing.
     if: ${{ !cancelled() }}
@@ -156,7 +157,7 @@ jobs:
         if: steps.mode.outputs.mode == 'mega-check'
         run: node apps/runner/src/index.js --mega-check
 
-      - name: Process one queued video and enforce retention
+      - name: Process up to 4 queued videos and enforce retention
         if: steps.plan.outputs.process == 'true'
         # Fails with a clear error and still lets the MEGA logout step run.
         timeout-minutes: 35
