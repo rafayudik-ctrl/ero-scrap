@@ -4,7 +4,7 @@ import path from 'node:path';
 import process from 'node:process';
 
 const ROOT = process.cwd();
-const SEARCH_ROOTS = ['apps', 'packages', 'tests', 'scripts'];
+const SEARCH_ROOTS = ['apps', 'packages', 'tests', 'scripts', 'workers'];
 const EXCLUDED = new Set(['node_modules', '.wrangler']);
 const files = [];
 

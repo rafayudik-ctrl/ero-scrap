@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/wrangler.json",
+  "name": "ero-scrap-scheduler",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-01",
+  // Nobody needs to reach this Worker: it only runs on its cron trigger.
+  "workers_dev": false,
+  "preview_urls": false,
+  "triggers": {
+    // Exact schedule (Cloudflare does not delay it): minutes 3, 23 and 43 of every hour.
+    "crons": ["3,23,43 * * * *"]
+  },
+  "vars": {
+    // CHANGE THIS to your user/repository, e.g. "maria/ero-scrap".
+    "GITHUB_REPO": "OWNER/REPO",
+    "GITHUB_REF": "main",
+    "WORKFLOW_FILE": "automation.yml",
+    "MODE": "auto"
+  }
+  // Secret (never written here):  npx wrangler secret put GITHUB_TOKEN
+}

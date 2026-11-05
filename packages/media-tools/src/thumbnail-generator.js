@@ -8,6 +8,9 @@ import { APP_CONFIG } from '../../config/src/app.js';
 const ALLOWED_EXTENSIONS = new Set(['.mp4', '.m4v', '.mov', '.mkv', '.webm', '.ogv']);
 const MAX_INPUT_BYTES = APP_CONFIG.media.maxFileBytes;
 const MAX_OUTPUT_BYTES = APP_CONFIG.media.thumbnailMaxBytes;
+// Fit inside a 320x320 box, keeping the aspect ratio and never upscaling:
+// landscape 16:9 -> 320x180, vertical 9:16 -> 180x320 (smaller than scaling by width only).
+export const THUMBNAIL_FILTER = `scale=w=min(${APP_CONFIG.media.thumbnailWidth}\\,iw):h=min(${APP_CONFIG.media.thumbnailWidth}\\,ih):force_original_aspect_ratio=decrease:force_divisible_by=2`;
 
 export class ThumbnailGeneratorError extends Error {
   constructor(message, { code = 'thumbnail_generation_failed', cause } = {}) {
@@ -90,7 +93,7 @@ export class FfmpegThumbnailGenerator {
         '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
         '-ss', '00:00:01', '-i', input,
         '-frames:v', '1', '-an',
-        '-vf', 'scale=min(320\\,iw):-2',
+        '-vf', THUMBNAIL_FILTER,
         '-c:v', 'libwebp', '-quality', '68', '-preset', 'picture',
         '-f', 'webp', output,
       ], { timeoutMs: this.#timeoutMs, spawnImpl: this.#spawn });

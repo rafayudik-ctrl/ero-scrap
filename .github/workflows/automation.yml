@@ -41,7 +41,9 @@ env:
 jobs:
   scan:
     name: Scan the two New pages
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.mode == 'auto' || inputs.mode == 'metadata' || inputs.mode == 'full' }}
+    # With the Cloudflare scheduler on (repository variable EXTERNAL_SCHEDULER=true) the
+    # GitHub `schedule` trigger is skipped, so a scan never runs twice per slot.
+    if: ${{ (github.event_name != 'schedule' || vars.EXTERNAL_SCHEDULER != 'true') && (github.event_name != 'workflow_dispatch' || inputs.mode == 'auto' || inputs.mode == 'metadata' || inputs.mode == 'full') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     concurrency:
@@ -64,7 +66,7 @@ jobs:
     name: Process up to 4 queued videos and enforce retention
     needs: scan
     # A skipped or failed scan must never block retention or video processing.
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && (github.event_name != 'schedule' || vars.EXTERNAL_SCHEDULER != 'true') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     concurrency:

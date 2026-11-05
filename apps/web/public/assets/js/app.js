@@ -93,6 +93,10 @@ function createVideoCard(item) {
       image.decoding = 'async';
       image.width = 320;
       image.height = 180;
+      // Vertical video: let the card use a portrait box (the file is 180x320, not 16:9).
+      image.addEventListener('load', () => {
+        if (image.naturalHeight > image.naturalWidth * 1.05) thumbnail.classList.add('is-portrait');
+      }, { once: true });
       image.addEventListener('error', () => {
         image.remove();
         thumbnail.textContent = 'Prévia indisponível';

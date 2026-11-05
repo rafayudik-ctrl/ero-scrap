@@ -66,7 +66,7 @@ Para desenvolvimento local, consulte [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 - Miniaturas privadas (D1 ou bucket R2 privado); URL MEGA não aparece no JSON público do catálogo.
 - 401/403, redirects e hosts fora da allowlist interrompem o downloader sem fallback de acesso; 429 é reagendado.
 - GitHub Actions schedule é best-effort, não um relógio de tempo real. Jobs podem atrasar ou ser coalescidos quando houver execução sobreposta.
-- O cron a cada dez minutos executa cerca de 4.320 jobs/mês. A verificação de retenção é feita dentro do mesmo job, sem um cron extra. Em repositório **público** os minutos de Actions são gratuitos e ilimitados; em um privado, a franquia gratuita de 2.000 min/mês não comporta esse ritmo. O workflow `keepalive` reativa os agendamentos semanalmente para o GitHub não desligá-los após 60 dias sem atividade.
+- O cron a cada 20 minutos executa cerca de 2.160 jobs/mês. Para pontualidade real há um agendador opcional grátis em `workers/scheduler/` (Cloudflare Cron Trigger, sem cartão); veja a seção 17 de `docs/CLOUD_DEPLOYMENT.md`. A verificação de retenção é feita dentro do mesmo job, sem um cron extra. Em repositório **público** os minutos de Actions são gratuitos e ilimitados; em um privado, a franquia gratuita de 2.000 min/mês não comporta esse ritmo. O workflow `keepalive` reativa os agendamentos semanalmente para o GitHub não desligá-los após 60 dias sem atividade.
 
 ## Documentação
 

@@ -350,18 +350,55 @@ Nunca edite a cópia de `COPY_AUTHORIZED` em `.env`, secret ou Pages variable: e
 - O catálogo continua privado: a API exige a senha do site (ou o Cloudflare Access); o código público não dá acesso aos dados.
 - Se você não quiser expor nem o código, a alternativa é repositório privado, mas então os 2.000 minutos mensais não bastam para varrer a cada dez minutos.
 
-## 17. Frequência e gatilho externo opcional
+## 17. Agendamento: escolha quem dispara o workflow
 
-O workflow roda a cada 20 minutos (`7,27,47 * * * *`). O agendador do GitHub (`schedule`) **não garante horário**: em horários de pico ele atrasa ou descarta execuções, e isso é pior em repositórios com pouca atividade. Ver só 3 execuções em 12 horas é um caso comum.
+O workflow processa tudo a cada 20 minutos, mas **quem o dispara** pode ser escolhido. Todas as opções são grátis e sem cartão, e a única trava continua sendo `COPY_AUTHORIZED` (o disparo usa sempre o modo `auto`).
 
-Se quiser regularidade real, sem cartão e sem código novo, use um agendador externo grátis para disparar o workflow pela API do GitHub. O `schedule` continua como reserva.
+| Opção | Pontualidade | Esforço |
+|---|---|---|
+| A. Cloudflare Worker agendador (**recomendada**) | Exata: minutos 3, 23 e 43 | 10 min, uma vez |
+| B. cron-job.org | Boa | 5 min, sem código |
+| C. Só o `schedule` do GitHub (padrão) | Ruim: atrasa e descarta | Nada |
 
-1. GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate. Repositório: só este. Permissão: **Actions: Read and write**. Validade: 1 ano.
-2. Em https://cron-job.org (grátis, sem cartão) crie um cron job a cada 20 minutos:
-   - URL: `https://api.github.com/repos/SEU_USUARIO/SEU_REPO/actions/workflows/automation.yml/dispatches`
-   - Método: `POST`
-   - Cabeçalhos: `Authorization: Bearer SEU_TOKEN`, `Accept: application/vnd.github+json`, `User-Agent: ero-scrap`
-   - Corpo: `{"ref":"main","inputs":{"mode":"auto"}}`
-3. Resposta esperada: `204`. O token só dispara workflows deste repositório e nunca vai para o código.
+O `schedule` do GitHub **não garante horário**: em horários de pico ele atrasa ou descarta execuções, ainda mais em repositórios com pouca atividade. Ver só 3 execuções em 12 horas é um caso comum.
 
-Os grupos de concorrência (`ero-scrap-scan`, `ero-scrap-storage`) já impedem execuções sobrepostas, então um disparo duplicado do GitHub e do agendador externo não causa trabalho duplicado.
+### 17.1 Token do GitHub (necessário para A e B)
+
+1. GitHub → foto de perfil → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new token.
+2. Repository access: **Only select repositories** → este repositório.
+3. Permissions → Repository permissions → **Actions: Read and write** (nenhuma outra).
+4. Expiration: a maior disponível. Anote a data: quando vencer, gere outro e repita só o passo de colar o segredo.
+5. Copie o token (começa com `github_pat_`). Ele só dispara workflows deste repositório e nunca vai para o código.
+
+### 17.2 Opção A: Worker agendador na Cloudflare
+
+O Worker (`workers/scheduler/src/index.js`) faz **uma requisição a cada 20 minutos** e nada mais: sem banco, sem estado, sem dependências. Usa um milissegundo de CPU e poucos KB de RAM, e o plano grátis permite 100.000 execuções por dia.
+
+**Pelo painel (sem instalar nada):**
+
+1. Cloudflare → Workers & Pages → Create → **Create Worker** → nome `ero-scrap-scheduler` → Deploy.
+2. Edit code → apague tudo e cole o conteúdo de `workers/scheduler/src/index.js` → Deploy.
+3. Settings → **Variables and Secrets** → adicione:
+   - `GITHUB_REPO` (texto) = `seu-usuario/seu-repositorio`
+   - `GITHUB_TOKEN` (**Secret**) = o token do passo 17.1
+   - Opcionais: `GITHUB_REF` (padrão `main`) e `WORKFLOW_FILE` (padrão `automation.yml`).
+4. Settings → **Trigger Events** → Add → **Cron Triggers** → `3,23,43 * * * *`.
+5. Settings → Domains & Routes: deixe o `workers.dev` **desligado** (o Worker não precisa de endereço público).
+
+**Pela linha de comando:** edite `GITHUB_REPO` em `workers/scheduler/wrangler.jsonc`, depois `cd workers/scheduler`, `npx wrangler deploy` e `npx wrangler secret put GITHUB_TOKEN`.
+
+**Desligar o agendador do GitHub (evita escanear duas vezes):** GitHub → Settings → Secrets and variables → Actions → aba **Variables** → New repository variable → `EXTERNAL_SCHEDULER` = `true`. Com ela, as execuções do `schedule` do GitHub são ignoradas (não gastam minutos). Para voltar ao agendador do GitHub, apague a variável ou ponha `false`.
+
+**Como conferir:** no próximo minuto 3, 23 ou 43, aparece uma execução "Ero-Scrap automation" na aba Actions, com o evento `workflow_dispatch`. Se não aparecer, Cloudflare → Worker → Observability/Logs mostra o motivo: `401` token errado ou vencido, `404` nome do repositório ou do workflow errado, `403` permissão faltando. Uma falha aparece como execução com erro no painel.
+
+### 17.3 Opção B: cron-job.org (sem código)
+
+1. Em https://cron-job.org (grátis, sem cartão) crie um cron job a cada 20 minutos.
+2. URL: `https://api.github.com/repos/SEU_USUARIO/SEU_REPO/actions/workflows/automation.yml/dispatches`, método `POST`.
+3. Cabeçalhos: `Authorization: Bearer SEU_TOKEN`, `Accept: application/vnd.github+json`, `User-Agent: ero-scrap`.
+4. Corpo: `{"ref":"main","inputs":{"mode":"auto"}}`. Resposta esperada: `204`.
+5. Crie também a variável `EXTERNAL_SCHEDULER` = `true` (como na opção A) para o GitHub não disparar em paralelo.
+
+### 17.4 Quando mais de uma fonte dispara
+
+Os grupos de concorrência (`ero-scrap-scan`, `ero-scrap-storage`) impedem execuções sobrepostas, mas uma execução extra ainda faz um scan a mais. Por isso, ao usar A ou B, mantenha `EXTERNAL_SCHEDULER=true`. O `keepalive.yml` continua valendo para o GitHub não desativar o workflow por inatividade.
