@@ -42,6 +42,11 @@ function requireIds(value) {
   return [...new Set(value)];
 }
 
+function requireKeywordKey(value) {
+  if (typeof value !== 'string' || !/^[a-f0-9]{16}$/u.test(value)) throw new TypeError('keywordKey is invalid.');
+  return value;
+}
+
 function sanitizeListingPosts(value) {
   if (!Array.isArray(value) || value.length > MAX_POST_BATCH) {
     throw new RangeError(`posts must contain at most ${MAX_POST_BATCH} records.`);
@@ -176,6 +181,14 @@ export async function executeCollectorCommand(db, operation, rawPayload, { thumb
 
     case 'posts.upsert':
       await repository.upsertListingPosts(sanitizeListingPosts(payload.posts), requireIsoDate(payload.now, 'now'));
+      return { ok: true };
+
+    case 'scan.seen.get': {
+      return { ids: await repository.getSeenPosts(requireKeywordKey(payload.keywordKey)) };
+    }
+
+    case 'scan.seen.save':
+      await repository.saveSeenPosts(requireKeywordKey(payload.keywordKey), requireIds(payload.ids));
       return { ok: true };
 
     case 'posts.pending': {
@@ -320,10 +333,12 @@ export async function executeCollectorCommand(db, operation, rawPayload, { thumb
     }
 
     case 'maintenance.prune': {
-      const { staleMetadataDays, finishedJobDays, batchSize } = APP_CONFIG.maintenance;
+      const { staleMetadataDays, discardedMetadataDays, finishedJobDays, batchSize } = APP_CONFIG.maintenance;
       return repository.pruneStale({
         now: requireIsoDate(payload.now, 'now'),
+        continuation: payload.continuation === true,
         retainDays: staleMetadataDays,
+        discardedDays: discardedMetadataDays,
         jobRetainDays: finishedJobDays,
         batchSize,
       });

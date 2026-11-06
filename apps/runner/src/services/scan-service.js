@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { APP_CONFIG } from '../../../../packages/config/src/app.js';
 import { isCopyAuthorized } from '../../../../packages/config/src/security.js';
 import { loadSearchKeyword } from '../../../../packages/config/src/keyword-file.js';
@@ -123,22 +124,33 @@ export class ScanService {
       }
 
       const listingPosts = mergeListingPosts(pageResults);
-      await this.#repository.upsertListingPosts(listingPosts, this.#now().toISOString());
+      const listingIds = listingPosts.map((post) => post.id);
 
-      // Detail pages are fetched only for albums still visible in the current
-      // first two New pages. We do not continue crawling older pages/history.
-      const pending = await this.#repository.getPendingInspection(
-        listingPosts.map((post) => post.id),
-        this.#maxInspections,
-        keyword,
-      );
+      // D1's free plan allows only 100,000 row writes per day, and every row costs one write
+      // per index too. So the database receives ONLY posts that match the keyword. Which
+      // albums were already looked at is remembered in one small row (a single write per scan,
+      // and only when something new was checked), keyed by the keyword so changing it re-checks.
+      const keywordKey = createHash('sha256').update(keyword.trim().toLowerCase()).digest('hex').slice(0, 16);
+      const seen = new Set(await this.#repository.getSeenPosts(keywordKey));
+      const pending = listingPosts.filter((post) => !seen.has(post.id)).slice(0, this.#maxInspections);
+      const checked = new Set();
 
       for (const candidate of pending) {
         try {
-          const html = await this.#source.fetchAlbum(candidate.canonical_url);
+          const html = await this.#source.fetchAlbum(candidate.canonicalUrl);
           const inspectedAt = this.#now().toISOString();
-          const parsed = parseAlbumPage(html, candidate.canonical_url, { inspectedAt });
-          await this.#repository.savePostInspection(parsed, inspectedAt);
+          const parsed = parseAlbumPage(html, candidate.canonicalUrl, { inspectedAt });
+          const matched = matchesSingleKeyword({
+            title: parsed.title || candidate.title,
+            tags: parsed.tags.map((tag) => tag.name),
+            keyword,
+          });
+          // Albums with only images, or that do not match, are never written to the database.
+          if (matched && parsed.videos.length > 0) {
+            await this.#repository.upsertListingPosts([candidate], inspectedAt);
+            await this.#repository.savePostInspection(parsed, inspectedAt);
+          }
+          checked.add(candidate.id);
         } catch (error) {
           inspectionFailures += 1;
           errorCode ??= getErrorCode(error);
@@ -146,7 +158,14 @@ export class ScanService {
         }
       }
 
-      const snapshots = await this.#repository.getPostSnapshots(listingPosts.map((post) => post.id));
+      if (checked.size > 0) {
+        // Keep only ids still on pages 1-2; everything else can never be requested again.
+        const nextSeen = listingIds.filter((id) => seen.has(id) || checked.has(id));
+        await this.#repository.saveSeenPosts(keywordKey, nextSeen);
+      }
+      const inspectionBacklog = listingPosts.filter((post) => !seen.has(post.id) && !checked.has(post.id)).length;
+
+      const snapshots = await this.#repository.getPostSnapshots(listingIds);
       const evaluations = [];
       let matchingPosts = 0;
       let videoCandidates = 0;
@@ -178,7 +197,6 @@ export class ScanService {
 
       await this.#repository.updateEvaluations(evaluations, this.#now().toISOString());
 
-      const inspectionBacklog = snapshots.filter((post) => !post.details_checked_at).length;
       const status = errorCode || inspectionFailures > 0 || inspectionBacklog > 0 || pagesScanned < 2
         ? 'partial'
         : 'succeeded';

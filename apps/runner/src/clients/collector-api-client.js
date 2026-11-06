@@ -132,6 +132,15 @@ export class CollectorApiClient {
     return result.posts;
   }
 
+  async getSeenPosts(keywordKey) {
+    const result = await this.#command('scan.seen.get', { keywordKey });
+    return result.ids;
+  }
+
+  async saveSeenPosts(keywordKey, ids) {
+    await this.#command('scan.seen.save', { keywordKey, ids });
+  }
+
   async savePostInspection(inspection, now) {
     await this.#command('post.inspect', { inspection, now });
   }
@@ -190,8 +199,8 @@ export class CollectorApiClient {
     return this.#command('retention.fail', { jobId, leaseToken, attempts, errorCode, now });
   }
 
-  async pruneStale({ now = new Date().toISOString() } = {}) {
-    return this.#command('maintenance.prune', { now });
+  async pruneStale({ now = new Date().toISOString(), continuation = false } = {}) {
+    return this.#command('maintenance.prune', { now, continuation });
   }
 
   async uploadThumbnail(assetId, bytes) {

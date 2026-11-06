@@ -402,3 +402,26 @@ O Worker (`workers/scheduler/src/index.js`) faz **uma requisição a cada 20 min
 ### 17.4 Quando mais de uma fonte dispara
 
 Os grupos de concorrência (`ero-scrap-scan`, `ero-scrap-storage`) impedem execuções sobrepostas, mas uma execução extra ainda faz um scan a mais. Por isso, ao usar A ou B, mantenha `EXTERNAL_SCHEDULER=true`. O `keepalive.yml` continua valendo para o GitHub não desativar o workflow por inatividade.
+
+## 18. Limite diário de escrita do D1 (plano grátis)
+
+O D1 grátis permite **100.000 linhas escritas por dia** (zera às 00:00 UTC, 21:00 no horário de Brasília) e 5 milhões de linhas lidas. Cada linha gravada conta uma escrita **por índice também**, então um vídeo gravado custa cerca de 10 escritas e um post completo, cerca de 77.
+
+Quando o limite estoura, o log mostra `D1_ERROR: Your account has exceeded D1's free tier daily row write limit` (operação `scan.finish`, `process.claim` etc.) e tudo para até o dia seguinte.
+
+O que o projeto faz para ficar longe do limite (v0.4.14):
+
+- **Só grava o que casa com a palavra-chave.** O scan olha cada álbum novo no Erome, decide na hora e só envia ao banco os posts com a palavra no título ou nas tags e com vídeo. O resto nunca é gravado.
+- **Lembrança em uma única linha.** Os álbuns já examinados ficam numa linha da tabela `scan_state` (uma escrita por scan, e só quando algo novo foi examinado). Trocar a palavra-chave refaz o exame uma vez.
+- **Faxina diária limitada.** A limpeza roda uma vez por dia (no máximo 3 lotes de 500). Linhas descartadas (ignorado, longo demais...) saem em 3 dias; as que ainda estão no processo, em 14 dias; mídia guardada nunca é tocada.
+
+Uso esperado: cerca de 7 escritas por scan (cerca de 500 por dia, sem contar os vídeos que casam) mais cerca de 10 por vídeo guardado, bem abaixo dos 100.000.
+
+**Depois de atualizar:** a tabela nova é criada sozinha (também existe a migration `0009_scan_state.sql`). O banco antigo ainda tem muitos posts que nunca serão usados; eles saem aos poucos na faxina diária, o que gasta algumas dezenas de milhares de escritas por dia durante alguns dias. Se o limite estourar de novo, aguarde as 21:00.
+
+**Conferir o consumo:** Cloudflare → Storage & Databases → D1 → seu banco → **Metrics** (linhas escritas por dia).
+
+### Se mesmo assim não bastar: outro serviço grátis
+
+- **Turso (SQLite na nuvem):** plano grátis com **10 milhões de escritas por mês (cerca de 333 mil por dia, mais de 3 vezes o D1)**, 500 milhões de leituras e 5 GB, sem cartão. Exigiria trocar o adaptador do banco do Worker (as consultas já são SQLite). Não está implementado; peça se quiser.
+- Cloudflare D1 pago (US$ 5/mês, pede cartão) é o caminho mais simples, mas foge da regra de ser grátis sem cartão.

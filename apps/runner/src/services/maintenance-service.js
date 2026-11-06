@@ -41,7 +41,7 @@ export class MaintenanceService {
   async runOnce() {
     const totals = { videos: 0, posts: 0, scans: 0, jobs: 0, batches: 0 };
     for (let batch = 0; batch < this.#maxBatches; batch += 1) {
-      const result = await this.#repository.pruneStale({ now: this.#now().toISOString() });
+      const result = await this.#repository.pruneStale({ now: this.#now().toISOString(), continuation: batch > 0 });
       totals.batches += 1;
       let full = false;
       for (const key of ['videos', 'posts', 'scans', 'jobs']) {

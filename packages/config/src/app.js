@@ -37,10 +37,14 @@ export const APP_CONFIG = Object.freeze({
     // Hourly cron ticks inside this UTC hour run the housekeeping pass; every
     // other tick skips it, so D1 is not touched 144 times a day for nothing.
     utcHour: 3,
+    // Rows of videos that will never be copied (ignored, too long...) go after 3 days;
+    // rows still in the pipeline (eligible, queued...) keep the longer window.
+    discardedMetadataDays: 3,
     staleMetadataDays: 14,
     finishedJobDays: 7,
     batchSize: 500,
-    maxBatchesPerRun: 20,
+    // Deleting costs row writes too (rows + indexes). 3 x 500 keeps a pass far below D1's 100,000/day.
+    maxBatchesPerRun: 3,
   }),
   catalog: Object.freeze({
     defaultPageSize: 24,

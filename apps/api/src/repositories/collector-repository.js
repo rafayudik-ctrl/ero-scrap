@@ -72,6 +72,35 @@ export class CollectorRepository {
     this.#db = new D1BindingAdapter(databaseBinding);
   }
 
+  /**
+   * Ids of albums already examined for this keyword (one row, replaced as a whole).
+   * A different keyword key yields an empty list, which restarts the check.
+   */
+  async getSeenPosts(keywordKey) {
+    await this.#ensureStateTable();
+    const rows = await this.#db.query('SELECT value FROM scan_state WHERE key = ?', ['seen_posts']);
+    try {
+      const stored = JSON.parse(rows[0]?.value ?? 'null');
+      return stored?.keywordKey === keywordKey && Array.isArray(stored.ids) ? stored.ids.filter(isValidPostId) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  async saveSeenPosts(keywordKey, ids, now = new Date().toISOString()) {
+    await this.#ensureStateTable();
+    const value = JSON.stringify({ keywordKey, ids: ids.filter(isValidPostId).slice(0, 400) });
+    await this.#db.run(`
+      INSERT INTO scan_state (key, value, updated_at) VALUES ('seen_posts', ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `, [value, now]);
+  }
+
+  // Zero-friction upgrade: creating an existing table writes no rows.
+  async #ensureStateTable() {
+    await this.#db.run('CREATE TABLE IF NOT EXISTS scan_state (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL)');
+  }
+
   async createScanRun(startedAt = new Date().toISOString()) {
     const id = crypto.randomUUID();
     await this.#db.run(`
@@ -701,14 +730,30 @@ export class CollectorRepository {
    * old scan history and finished retention jobs. Stored/clicked/delete_pending
    * videos and dead jobs are never touched.
    */
-  async pruneStale({ now = new Date().toISOString(), retainDays = 14, jobRetainDays = 7, batchSize = 500 } = {}) {
+  async pruneStale({ now = new Date().toISOString(), retainDays = 14, discardedDays = 3, jobRetainDays = 7, batchSize = 500, continuation = false } = {}) {
     if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 1_000) {
       throw new RangeError('Prune batch size must be between 1 and 1000.');
     }
     if (!Number.isInteger(retainDays) || retainDays < 3 || !Number.isInteger(jobRetainDays) || jobRetainDays < 1) {
       throw new RangeError('Prune retention windows are too short.');
     }
+    if (!Number.isInteger(discardedDays) || discardedDays < 1 || discardedDays > retainDays) {
+      throw new RangeError('discardedDays must be between 1 and retainDays.');
+    }
+    // At most one housekeeping run per UTC day, even if several scans fall inside the
+    // maintenance hour. Later batches of the same run pass `continuation`.
+    if (!continuation) {
+      await this.#ensureStateTable();
+      const today = now.slice(0, 10);
+      const rows = await this.#db.query('SELECT value FROM scan_state WHERE key = ?', ['last_prune']);
+      if (rows[0]?.value === today) return { videos: 0, posts: 0, scans: 0, jobs: 0, skipped: true };
+      await this.#db.run(`
+        INSERT INTO scan_state (key, value, updated_at) VALUES ('last_prune', ?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+      `, [today, now]);
+    }
     const cutoff = new Date(Date.parse(now) - retainDays * 86_400_000).toISOString();
+    const discardedCutoff = new Date(Date.parse(now) - discardedDays * 86_400_000).toISOString();
     const jobCutoff = new Date(Date.parse(now) - jobRetainDays * 86_400_000).toISOString();
 
     const results = await this.#db.batch([
@@ -716,10 +761,12 @@ export class CollectorRepository {
         sql: `DELETE FROM video_assets
               WHERE id IN (
                 SELECT id FROM video_assets
-                WHERE discovered_at < ? AND status NOT IN ('stored', 'clicked', 'delete_pending')
+                WHERE status NOT IN ('stored', 'clicked', 'delete_pending')
+                  AND ((status IN ('discovered', 'ignored', 'too_long', 'duration_unknown', 'copy_blocked') AND discovered_at < ?)
+                       OR discovered_at < ?)
                 LIMIT ?
               )`,
-        params: [cutoff, batchSize],
+        params: [discardedCutoff, cutoff, batchSize],
       },
       {
         sql: `DELETE FROM post_tags
@@ -729,7 +776,7 @@ export class CollectorRepository {
                   AND NOT EXISTS (SELECT 1 FROM video_assets a WHERE a.post_id = p.id)
                 LIMIT ?
               )`,
-        params: [cutoff, batchSize],
+        params: [discardedCutoff, batchSize],
       },
       {
         sql: `DELETE FROM posts
@@ -739,7 +786,7 @@ export class CollectorRepository {
                   AND NOT EXISTS (SELECT 1 FROM video_assets a WHERE a.post_id = p.id)
                 LIMIT ?
               )`,
-        params: [cutoff, batchSize],
+        params: [discardedCutoff, batchSize],
       },
       {
         sql: `DELETE FROM scan_runs

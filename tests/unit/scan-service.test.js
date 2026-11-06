@@ -44,6 +44,11 @@ class FakeRepository {
   details = new Map();
   evaluations = [];
   scan = null;
+  seen = { keywordKey: null, ids: [] };
+  seenWrites = 0;
+
+  async getSeenPosts(keywordKey) { return this.seen.keywordKey === keywordKey ? this.seen.ids : []; }
+  async saveSeenPosts(keywordKey, ids) { this.seen = { keywordKey, ids: [...ids] }; this.seenWrites += 1; }
 
   async createScanRun(startedAt) {
     this.scan = { id: 'scan-test', startedAt };
@@ -154,7 +159,7 @@ test('scan checks only New pages 1 and 2 and matches title OR tags', async () =>
     assert.deepEqual(fetchedAlbums.sort(), ['/a/ImgOnly1', '/a/Other1234', '/a/Tagg5678', '/a/Title1234'].sort());
     assert.equal(result.pagesScanned, 2);
     assert.equal(result.postsSeen, 4);
-    assert.equal(result.matchingPosts, 3); // Two matched titles plus the tag-only match.
+    assert.equal(result.matchingPosts, 2); // Only stored posts count: the title match and the tag-only match.
     assert.equal(result.videoCandidates, 2); // Exactly 10:00 and 09:59.
     assert.equal(result.videosTooLong, 1);
     assert.equal(result.videosWithUnknownDuration, 1);
@@ -165,8 +170,12 @@ test('scan checks only New pages 1 and 2 and matches title OR tags', async () =>
     assert.equal(statuses.get('Title1234-video-1'), 'too_long');
     assert.equal(statuses.get('Title1234-video-2'), 'duration_unknown');
     assert.equal(statuses.get('Tagg5678-video-0'), CANDIDATE);
-    assert.equal(statuses.get('Other1234-video-0'), 'ignored');
-    assert.equal(repository.details.get('ImgOnly1').videos.length, 0);
+    // Posts that do not match, and albums with only images, never reach the database.
+    assert.equal(repository.posts.has('Other1234'), false);
+    assert.equal(repository.posts.has('ImgOnly1'), false);
+    assert.equal(repository.details.has('Other1234'), false);
+    assert.equal(repository.seenWrites, 1);
+    assert.deepEqual([...repository.seen.ids].sort(), ['ImgOnly1', 'Other1234', 'Tagg5678', 'Title1234']);
     assert.equal(result.status, 'succeeded');
     assert.equal(repository.scan.status, 'succeeded');
     assert.ok(logs.length > 0);
@@ -215,7 +224,10 @@ test('keyword is reloaded from the same file at each run', async () => {
 
     assert.ok(firstCandidates > 0);
     assert.equal(latestCandidates, 1); // The tag/title match changes without a restart.
-    assert.equal(titleFetches, 4); // Already-inspected album pages were not fetched again.
+    assert.equal(titleFetches, 8); // A new keyword re-checks every album once.
+
+    await service.runOnce();
+    assert.equal(titleFetches, 8); // The same keyword never fetches an examined album again.
   });
 });
 
@@ -266,5 +278,28 @@ test('scan sends only evaluations that change a video status', async () => {
     const service = new ScanService({ sourceClient, repository, keywordFilePath, logger: { info() {}, error() {} } });
     await service.runOnce();
     assert.deepEqual(sent, [{ id: 'v-changed', status: 'too_long' }]);
+  });
+});
+
+
+test('a quiet scan writes nothing to the database besides the scan record', async () => {
+  await withKeyword('needle', async (keywordFilePath) => {
+    const repository = new FakeRepository();
+    const writes = [];
+    for (const method of ['upsertListingPosts', 'savePostInspection', 'updateEvaluations']) {
+      const original = repository[method].bind(repository);
+      repository[method] = async (...args) => { writes.push(method); return original(...args); };
+    }
+    const sourceClient = {
+      async fetchNewPage(pageNumber) { return pageNumber === 1 ? listingPage1 : listingPage2; },
+      async fetchAlbum(url) { return albumPages.get(new URL(url).pathname); },
+    };
+    const service = new ScanService({ sourceClient, repository, keywordFilePath, logger: { info() {} } });
+    await service.runOnce();
+    writes.length = 0;
+    const seenWritesBefore = repository.seenWrites;
+    await service.runOnce();
+    assert.deepEqual(writes.filter((name) => name !== 'updateEvaluations'), []);
+    assert.equal(repository.seenWrites, seenWritesBefore);
   });
 });
