@@ -14,6 +14,7 @@ import { FfprobeMediaInspector, FfmpegThumbnailGenerator } from '../../../packag
 import { EromeMediaDownloader } from '../../../packages/source-erome/src/media-downloader.js';
 import { EromeMediaProcessingService } from './services/erome-media-processing-service.js';
 import { isCopyAuthorized } from '../../../packages/config/src/security.js';
+import { sanitizeDiagnostic, describeError } from '../../../packages/config/src/diagnostics.js';
 
 export function createRunner({ env = process.env, fetchImpl = globalThis.fetch, logger = console } = {}) {
   const config = loadRunnerConfig(env);
@@ -185,12 +186,37 @@ retention_due=${retentionDue}
   ]);
 }
 
+/**
+ * Prints everything needed to fix a failed run, once, in the GitHub log: the
+ * failing operation, HTTP status, server-side cause, a hint and a short stack.
+ * Text is sanitized (no URLs, tokens or long opaque strings) because public
+ * repositories have public logs.
+ */
+function reportFatalError(error) {
+  const lines = [`[ero-scrap] runner stopped: ${sanitizeDiagnostic(error?.message ?? 'unknown error')}`];
+  const facts = [];
+  if (error?.operation) facts.push(`operation=${error.operation}`);
+  if (error?.status) facts.push(`http_status=${error.status}`);
+  if (error?.code) facts.push(`code=${sanitizeDiagnostic(error.code, 60)}`);
+  if (facts.length) lines.push(`  ${facts.join(' ')}`);
+  if (error?.detail) lines.push(`  detail: ${sanitizeDiagnostic(error.detail, 700)}`);
+  if (error?.hint) lines.push(`  hint: ${sanitizeDiagnostic(error.hint, 240)}`);
+  for (const item of describeError(error?.cause).slice(0, 2)) {
+    lines.push(`  cause: ${item.name}${item.code ? `(${item.code})` : ''}: ${item.message}`);
+  }
+  const stack = String(error?.stack ?? '').split('\n').slice(1, 7).map((line) => sanitizeDiagnostic(line.replace(process.cwd(), '.'), 160)).filter(Boolean);
+  if (stack.length) lines.push(`  stack: ${stack.join(' | ')}`);
+  console.error(lines.join('\n'));
+  // Shows the headline on the workflow summary page without opening the log.
+  if (process.env.GITHUB_ACTIONS === 'true') console.error(`::error title=Ero-Scrap runner stopped::${lines.slice(0, 3).join(' ').replace(/[\r\n]/gu, ' ')}`);
+}
+
 const isDirectExecution = process.argv[1]
   && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 
 if (isDirectExecution) {
   main().catch((error) => {
-    console.error('[ero-scrap] runner stopped:', error?.message ?? 'unknown error');
+    reportFatalError(error);
     process.exitCode = 1;
   });
 }

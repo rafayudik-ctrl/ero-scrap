@@ -1,9 +1,14 @@
+import { sanitizeDiagnostic } from '../../../../packages/config/src/diagnostics.js';
+
 export class CollectorApiError extends Error {
-  constructor(message, { status = null, code = 'collector_api_error', cause } = {}) {
+  constructor(message, { status = null, code = 'collector_api_error', cause, operation = null, detail = null, hint = null } = {}) {
     super(message, { cause });
     this.name = 'CollectorApiError';
     this.status = status;
     this.code = code;
+    this.operation = operation;
+    this.detail = detail;
+    this.hint = hint;
   }
 }
 
@@ -73,24 +78,37 @@ export class CollectorApiClient {
       throw new CollectorApiError('Could not reach the private collector API.', {
         code: error?.name === 'TimeoutError' || error?.name === 'AbortError' ? 'collector_timeout' : 'collector_network_error',
         cause: error,
+        operation,
       });
     }
 
     let body;
+    let rawText = '';
     try {
-      body = await response.json();
+      rawText = await response.text();
+      body = JSON.parse(rawText);
     } catch (error) {
+      // Typically an HTML error page from Cloudflare (limits, outage, wrong URL): show its text.
       throw new CollectorApiError('The private collector API returned invalid JSON.', {
         status: response.status,
         code: 'collector_invalid_response',
         cause: error,
+        operation,
+        detail: `content-type=${sanitizeDiagnostic(response.headers?.get?.('content-type') ?? '', 60)} body="${sanitizeDiagnostic(rawText, 300)}"`,
       });
     }
 
     if (!response.ok || body?.ok !== true) {
-      throw new CollectorApiError(body?.error?.message ?? 'The private collector operation failed.', {
+      const failure = body?.error ?? {};
+      const causes = Array.isArray(failure.causes)
+        ? failure.causes.slice(0, 3).map((item) => `${sanitizeDiagnostic(item?.name, 40)}${item?.code ? `(${sanitizeDiagnostic(item.code, 40)})` : ''}: ${sanitizeDiagnostic(item?.message, 300)}`).join(' <- ')
+        : null;
+      throw new CollectorApiError(failure.message ?? 'The private collector operation failed.', {
         status: response.status,
-        code: body?.error?.code ?? 'collector_request_failed',
+        code: failure.code ?? 'collector_request_failed',
+        operation: sanitizeDiagnostic(failure.operation ?? operation, 40),
+        detail: causes,
+        hint: failure.hint ? sanitizeDiagnostic(failure.hint, 200) : null,
       });
     }
     return body.data;

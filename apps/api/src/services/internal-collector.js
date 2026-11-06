@@ -1,6 +1,7 @@
 import { executeCollectorCommand } from './collector-service.js';
 import { isCopyAuthorized } from '../../../../packages/config/src/security.js';
 import { errorResponse, jsonResponse } from '../lib/http.js';
+import { describeError, hintFor } from '../../../../packages/config/src/diagnostics.js';
 import { saveThumbnail, thumbnailDeleter, thumbnailStorageReady } from '../lib/thumbnail-store.js';
 
 const MAX_BODY_BYTES = 512 * 1024;
@@ -108,11 +109,19 @@ export async function handleInternalCollector(request, env) {
   } catch (error) {
     const knownCode = new Set(['unknown_operation']).has(error?.code);
     const isValidation = error instanceof TypeError || error instanceof RangeError;
-    return errorResponse(
-      knownCode ? error.code : isValidation ? 'invalid_payload' : 'collector_operation_failed',
-      isValidation || knownCode ? error.message : 'The collector operation could not be completed.',
-      knownCode ? 404 : isValidation ? 400 : 500,
-    );
+    if (knownCode || isValidation) {
+      return errorResponse(knownCode ? error.code : 'invalid_payload', error.message, knownCode ? 404 : 400);
+    }
+    // Unexpected failure: tell the (token-authenticated) runner exactly what happened.
+    // Only sanitized text is returned and logged: no URLs, tokens or payload values.
+    const causes = describeError(error);
+    const hint = hintFor(causes.map((item) => item.message).join(' '));
+    console.error('[collector] operation failed', { operation: body.operation, causes, hint });
+    return errorResponse('collector_operation_failed', 'The collector operation could not be completed.', 500, {}, {
+      operation: String(body.operation).slice(0, 40),
+      causes,
+      ...(hint ? { hint } : {}),
+    });
   }
 }
 

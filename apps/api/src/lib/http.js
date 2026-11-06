@@ -16,8 +16,8 @@ export function jsonResponse(data, status = 200, extraHeaders = {}) {
   });
 }
 
-export function errorResponse(code, message, status, extraHeaders = {}) {
-  return jsonResponse({ error: { code, message } }, status, extraHeaders);
+export function errorResponse(code, message, status, extraHeaders = {}, extraFields = {}) {
+  return jsonResponse({ error: { code, message, ...extraFields } }, status, extraHeaders);
 }
 
 export function getCorsHeaders(request, env) {
