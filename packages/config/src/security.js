@@ -3,7 +3,7 @@
  * Change this source constant only after the required permission has been
  * obtained and reviewed. Do not mirror it into client-side configuration.
  */
-export const COPY_AUTHORIZED = false;
+export const COPY_AUTHORIZED = true;
 
 export class CopyAuthorizationError extends Error {
   constructor(message = 'Media copying is disabled by the project safety gate.') {
