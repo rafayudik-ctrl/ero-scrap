@@ -425,3 +425,16 @@ Uso esperado: cerca de 7 escritas por scan (cerca de 500 por dia, sem contar os 
 
 - **Turso (SQLite na nuvem):** plano grátis com **10 milhões de escritas por mês (cerca de 333 mil por dia, mais de 3 vezes o D1)**, 500 milhões de leituras e 5 GB, sem cartão. Exigiria trocar o adaptador do banco do Worker (as consultas já são SQLite). Não está implementado; peça se quiser.
 - Cloudflare D1 pago (US$ 5/mês, pede cartão) é o caminho mais simples, mas foge da regra de ser grátis sem cartão.
+
+## 19. Ordenar, apagar antes do prazo e dias de retenção
+
+**Ordenar:** ao lado da busca há um seletor com **Mais recentes**, **Mais antigos**, **Maior duração** e **Menor duração**. A escolha fica lembrada no navegador.
+
+**Apagar antes do prazo:** cada cartão tem o botão **Apagar** (pede confirmação). O vídeo some do catálogo na hora e o arquivo é removido do MEGA na próxima execução do workflow (até cerca de 20 minutos). É uma única escrita no D1; o próprio processo de retenção que já existia faz a remoção.
+
+**Dias de retenção (vídeos que ninguém abriu):** o padrão agora é **4 dias**. Para mudar sem editar código (de 1 a 7):
+
+1. No repositório: Settings → Secrets and variables → Actions → aba **Variables** → New repository variable.
+2. Nome `UNOPENED_RETENTION_DAYS`, valor um número de 1 a 7 (por exemplo `7`).
+
+Vale para os vídeos novos. Se você **diminuir** o valor, os vídeos já guardados e ainda não abertos também são encurtados na faxina diária (uma vez por dia, perto das 00:00 no Brasil). Aumentar não estende os que já existem. Depois do primeiro clique continuam valendo 24 horas, qualquer que seja o valor. Para voltar ao padrão, apague a variável.

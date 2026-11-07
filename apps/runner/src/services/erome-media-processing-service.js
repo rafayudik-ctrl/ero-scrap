@@ -19,11 +19,12 @@ function safeErrorCode(error) {
   return SAFE_ERROR_CODE.test(code) ? code : 'media_processing_failed';
 }
 
-function toExpiresAt(uploadedAt) {
-  return new Date(Date.parse(uploadedAt) + APP_CONFIG.retention.unopenedDays * 86_400_000).toISOString();
+function toExpiresAt(uploadedAt, days) {
+  return new Date(Date.parse(uploadedAt) + days * 86_400_000).toISOString();
 }
 
 export class EromeMediaProcessingService {
+  #unopenedDays;
   #repository;
   #source;
   #downloader;
@@ -37,7 +38,9 @@ export class EromeMediaProcessingService {
   #authorizeCopy;
 
   constructor({ repository, sourceClient, downloader, mediaInspector, thumbnailGenerator, storage,
-    keywordFilePath, logger = console, now = () => new Date(), maxJobs = 1, authorizeCopy = assertCopyAuthorized }) {
+    keywordFilePath, logger = console, now = () => new Date(), maxJobs = 1, authorizeCopy = assertCopyAuthorized,
+    unopenedDays = APP_CONFIG.retention.unopenedDays }) {
+    this.#unopenedDays = unopenedDays;
     if (!repository || typeof repository.claimProcessVideoJobs !== 'function'
       || typeof repository.completeProcessVideoJob !== 'function'
       || typeof repository.failProcessVideoJob !== 'function') throw new TypeError('A media-job repository is required.');
@@ -165,7 +168,7 @@ export class EromeMediaProcessingService {
 
         const uploaded = await this.#storage.uploadLocalFile({ assetId: job.assetId, localPath: downloaded.localPath });
         const uploadedAt = uploaded.uploadedAt ?? this.#now().toISOString();
-        const expiresAt = toExpiresAt(uploadedAt);
+        const expiresAt = toExpiresAt(uploadedAt, this.#unopenedDays);
         await this.#repository.completeProcessVideoJob({
           jobId: job.jobId,
           assetId: job.assetId,

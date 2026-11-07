@@ -109,7 +109,15 @@ h1, h2, h3, p { margin-top: 0; }
 .video-details h3 { overflow: hidden; margin: 0 0 7px; color: var(--text); font-size: 13px; font-weight: 620; text-overflow: ellipsis; white-space: nowrap; }
 .video-details p { margin: 0; color: var(--text-tertiary); font-size: 10px; }
 .video-details .video-expiry { margin-top: 5px; color: var(--text-secondary); }
-.video-open-form { margin-top: 13px; }
+.video-actions { margin-top: 13px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.video-open-form { margin: 0; }
+.delete-video-button { min-height: 34px; padding: 0 13px; border: 1px solid var(--line); border-radius: 999px; color: var(--text-secondary); background: transparent; font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; transition: background .16s ease, border-color .16s ease, color .16s ease; }
+.delete-video-button:hover { color: #c0392b; border-color: #c0392b; background: rgba(192, 57, 43, .08); }
+.delete-video-button:focus-visible { outline: 3px solid rgba(192, 57, 43, .25); outline-offset: 2px; }
+.delete-video-button:disabled { cursor: wait; opacity: .6; }
+.sort-field select { min-height: 34px; padding: 0 28px 0 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--text-secondary); font: inherit; font-size: 12px; cursor: pointer; }
+.sort-field select:focus-visible { outline: 3px solid var(--accent-soft); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .open-video-button { min-height: 34px; padding: 0 13px; border: 1px solid var(--line); border-radius: 999px; color: var(--text); background: var(--surface-subtle); font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; transition: background .16s ease, border-color .16s ease, transform .16s ease; }
 .open-video-button:hover { background: var(--accent-soft); border-color: var(--accent); transform: translateY(-1px); }
 .open-video-button:focus-visible { outline: 3px solid var(--accent-soft); outline-offset: 2px; }

@@ -53,8 +53,9 @@ export function getCatalogStats(options) {
   return request('/api/stats', options);
 }
 
-export function getCatalogPage({ query = '', cursor = null, limit = 24, signal } = {}) {
+export function getCatalogPage({ query = '', cursor = null, limit = 24, order = 'recent', signal } = {}) {
   const params = new URLSearchParams({ limit: String(limit) });
+  if (order && order !== 'recent') params.set('order', order);
   if (query) params.set('q', query);
   if (cursor) params.set('cursor', cursor);
   return request(`/api/catalog?${params}`, { signal });
@@ -98,4 +99,11 @@ export function login(password) {
 
 export function logout() {
   return post('/api/logout', {});
+}
+
+export function deleteCatalogItem(itemId) {
+  if (typeof itemId !== 'string' || !/^[a-f0-9]{32}$/u.test(itemId)) {
+    throw new TypeError('Invalid catalog item ID.');
+  }
+  return post(`/api/catalog/${encodeURIComponent(itemId)}/delete`, {});
 }

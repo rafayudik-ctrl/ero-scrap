@@ -5,12 +5,14 @@ import { authMode } from './lib/password-auth.js';
 import { handleLogin, handleLogout } from './services/login.js';
 import { errorResponse, getCorsHeaders, jsonResponse } from './lib/http.js';
 import {
+  CATALOG_ORDERS,
   getActiveThumbnailKey,
   getCatalogItem,
   getCatalogStats,
   getLatestScan,
   listCatalogItems,
   recordFirstClickAndGetShareUrl,
+  requestEarlyDeletion,
 } from './repositories/catalog-repository.js';
 import { loadThumbnail, thumbnailBackend, thumbnailStorageReady } from './lib/thumbnail-store.js';
 import { handleInternalCollector, handleInternalThumbnailUpload } from './services/internal-collector.js';
@@ -83,6 +85,28 @@ async function handleOpenItem(request, env, itemId) {
   }
 }
 
+async function handleDeleteItem(request, env, itemId) {
+  if (request.method !== 'POST') {
+    return errorResponse('method_not_allowed', 'Deleting an item requires POST.', 405, { Allow: 'POST' });
+  }
+  if (!isTrustedMutationOrigin(request, env)) {
+    return errorResponse('origin_forbidden', 'Deleting an item must originate from the configured application.', 403);
+  }
+  if (!hasDatabase(env)) {
+    return errorResponse('database_unavailable', 'Database binding is not configured.', 503);
+  }
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return errorResponse(auth.code, 'Authentication is required.', auth.status);
+
+  try {
+    const deleted = await requestEarlyDeletion(env.DB, itemId);
+    if (!deleted) return errorResponse('item_unavailable', 'This item is expired, unavailable or already being deleted.', 410);
+    return jsonResponse({ data: { id: itemId, status: 'deleting' } }, 202);
+  } catch {
+    return errorResponse('delete_failed', 'Could not delete this catalog item.', 503);
+  }
+}
+
 async function handleThumbnail(request, env, itemId, corsHeaders) {
   if (!thumbnailStorageReady(env)) {
     return applyCors(errorResponse('thumbnail_storage_unavailable', 'Thumbnail storage is not configured.', 503), corsHeaders);
@@ -126,6 +150,8 @@ async function handleApi(request, env) {
 
   const openMatch = pathname.match(/^\/api\/catalog\/([a-f0-9]{32})\/open$/u);
   if (openMatch) return handleOpenItem(request, env, openMatch[1]);
+  const deleteMatch = pathname.match(/^\/api\/catalog\/([a-f0-9]{32})\/delete$/u);
+  if (deleteMatch) return handleDeleteItem(request, env, deleteMatch[1]);
   if (pathname === '/api/login') return handleLogin(request, env);
   if (pathname === '/api/logout') return handleLogout(request, env);
 
@@ -208,11 +234,16 @@ async function handleApi(request, env) {
     if (query.length > APP_CONFIG.catalog.maxSearchLength) {
       return applyCors(errorResponse('query_too_long', 'Search query is too long.', 400), corsHeaders);
     }
+    const order = searchParams.get('order') ?? 'recent';
+    if (!Object.hasOwn(CATALOG_ORDERS, order)) {
+      return applyCors(errorResponse('invalid_order', 'order must be recent, oldest, longest or shortest.', 400), corsHeaders);
+    }
     try {
       const page = await listCatalogItems(env.DB, {
         limit,
         cursor: searchParams.get('cursor'),
         query,
+        order,
       });
       if (page.invalidCursor) {
         return applyCors(errorResponse('invalid_cursor', 'Pagination cursor is invalid.', 400), corsHeaders);

@@ -24,7 +24,9 @@ export const APP_CONFIG = Object.freeze({
     startBudgetMs: 20 * 60 * 1000,
   }),
   retention: Object.freeze({
-    unopenedDays: 7,
+    // Default for videos nobody opens (1-7). Change it without editing code via the
+    // UNOPENED_RETENTION_DAYS repository variable (see packages/config/src/retention-days.js).
+    unopenedDays: 4,
     afterFirstClickHours: 24,
     sweepIntervalMinutes: 10,
     batchSize: 2,

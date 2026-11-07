@@ -83,6 +83,15 @@
             <kbd id="search-shortcut">Ctrl K</kbd>
           </label>
           <div class="toolbar-meta">
+            <label class="sort-field" for="catalog-order">
+              <span class="sr-only">Ordenar por</span>
+              <select id="catalog-order" aria-label="Ordenar vídeos">
+                <option value="recent">Mais recentes</option>
+                <option value="oldest">Mais antigos</option>
+                <option value="longest">Maior duração</option>
+                <option value="shortest">Menor duração</option>
+              </select>
+            </label>
             <span class="result-count" id="result-count">— itens</span>
             <button class="view-button is-active" id="view-grid" type="button" aria-label="Visualização em grade" aria-pressed="true">
               <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
@@ -108,7 +117,7 @@
             </span>
             <div>
               <strong>Armazenamento com acesso individual</strong>
-              <p id="authorization-text">O catálogo mostra somente arquivos já armazenados. O primeiro clique inicia a retenção de 24 horas; itens não abertos expiram em sete dias. A trava de cópia permanece fechada até haver autorização.</p>
+              <p id="authorization-text">O catálogo mostra somente arquivos já armazenados. O primeiro clique inicia a retenção de 24 horas; itens não abertos expiram na data indicada em cada cartão. A trava de cópia permanece fechada até haver autorização.</p>
             </div>
             <span class="notice-status" id="authorization-status">Bloqueado</span>
           </div>
@@ -152,7 +161,7 @@
           <article class="metric-card">
             <span class="metric-label">Não acessados</span>
             <strong class="metric-value" id="metric-unopened">—</strong>
-            <span class="metric-caption">Retenção prevista de 7 dias</span>
+            <span class="metric-caption">Retenção conforme a configuração</span>
           </article>
         </section>
 

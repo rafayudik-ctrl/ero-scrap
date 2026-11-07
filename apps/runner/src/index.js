@@ -40,6 +40,7 @@ export function createRunner({ env = process.env, fetchImpl = globalThis.fetch, 
     thumbnailGenerator,
     mediaInspector,
     logger,
+    unopenedDays: config.unopenedRetentionDays,
   });
   const retentionService = new RetentionService({
     repository,
@@ -48,7 +49,7 @@ export function createRunner({ env = process.env, fetchImpl = globalThis.fetch, 
     limit: config.retentionBatchSize,
     maxBatches: config.retentionMaxBatches,
   });
-  const maintenanceService = new MaintenanceService({ repository, logger });
+  const maintenanceService = new MaintenanceService({ repository, logger, unopenedDays: config.unopenedRetentionDays });
   const mediaProcessingService = new EromeMediaProcessingService({
     repository,
     sourceClient,
@@ -59,6 +60,7 @@ export function createRunner({ env = process.env, fetchImpl = globalThis.fetch, 
     keywordFilePath: config.keywordFilePath,
     logger,
     maxJobs: 1,
+    unopenedDays: config.unopenedRetentionDays,
   });
   const scanService = new ScanService({
     sourceClient,

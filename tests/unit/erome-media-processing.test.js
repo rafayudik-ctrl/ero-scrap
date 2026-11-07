@@ -66,7 +66,7 @@ test('media processing hard gate stops before claiming jobs or requesting album/
   assert.equal(downloads, 0);
 });
 
-test('authorized processing revalidates keyword/duration, downloads one exact video, uploads MEGA and registers a 7-day item', async () => {
+test('authorized processing revalidates keyword/duration, downloads one exact video, uploads MEGA and registers a 4-day item (the default)', async () => {
   await withWorkspace(async ({ keywordFilePath, localPath, thumbnailPath }) => {
     const calls = { claimed: 0, fetchedAlbum: [], downloads: [], inspected: [], generated: 0, uploaded: [], completed: [], thumbnails: [], cleanedDownload: 0, cleanedThumbnail: 0 };
     const now = () => new Date('2026-11-01T12:00:00.000Z');
@@ -99,7 +99,7 @@ test('authorized processing revalidates keyword/duration, downloads one exact vi
     }]);
     assert.deepEqual(calls.uploaded, [{ assetId: ASSET_ID, localPath }]);
     assert.equal(calls.completed.length, 1);
-    assert.equal(calls.completed[0].expiresAt, '2026-11-08T12:00:00.000Z');
+    assert.equal(calls.completed[0].expiresAt, '2026-11-05T12:00:00.000Z');
     assert.equal(calls.completed[0].shareUrl, 'https://mega.nz/file/AbCdEf#secretKey');
     assert.equal(calls.thumbnails.length, 1);
     assert.equal(calls.thumbnails[0].assetId, ASSET_ID);

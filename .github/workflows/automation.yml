@@ -37,6 +37,8 @@ env:
   # Optional secret. When set it replaces config/search-keyword.txt, so a public
   # repository does not reveal what is being monitored (secrets are masked in logs).
   SEARCH_KEYWORD: ${{ secrets.SEARCH_KEYWORD }}
+  # Days an unopened video stays stored (1-7). Empty = the default in packages/config/src/app.js (4).
+  UNOPENED_RETENTION_DAYS: ${{ vars.UNOPENED_RETENTION_DAYS }}
 
 jobs:
   scan:

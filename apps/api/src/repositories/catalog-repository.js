@@ -15,7 +15,17 @@ function mapCatalogRow(row) {
   };
 }
 
-export async function listCatalogItems(db, { limit, cursor, query }) {
+export const CATALOG_ORDERS = Object.freeze({
+  recent: { column: 'a.discovered_at', direction: 'DESC', byDuration: false },
+  oldest: { column: 'a.discovered_at', direction: 'ASC', byDuration: false },
+  longest: { column: 'a.duration_ms', direction: 'DESC', byDuration: true },
+  shortest: { column: 'a.duration_ms', direction: 'ASC', byDuration: true },
+});
+
+export async function listCatalogItems(db, { limit, cursor, query, order = 'recent' }) {
+  const sort = CATALOG_ORDERS[order];
+  if (!sort) throw new RangeError('Unknown catalog order.');
+  const comparison = sort.direction === 'ASC' ? '>' : '<';
   const safeLimit = Math.min(
     APP_CONFIG.catalog.maxPageSize,
     Math.max(1, Number.isInteger(limit) ? limit : APP_CONFIG.catalog.defaultPageSize),
@@ -43,9 +53,18 @@ export async function listCatalogItems(db, { limit, cursor, query }) {
     bindings.push(normalizedQuery, normalizedQuery);
   }
 
+  if (decodedCursor && sort.byDuration && decodedCursor.durationMs == null) {
+    return { invalidCursor: true, items: [], nextCursor: null, hasMore: false };
+  }
   if (decodedCursor) {
-    conditions.push('(a.discovered_at < ? OR (a.discovered_at = ? AND a.id < ?))');
-    bindings.push(decodedCursor.discoveredAt, decodedCursor.discoveredAt, decodedCursor.id);
+    // Keyset pagination on the chosen column, with the id as a stable tiebreaker.
+    if (sort.byDuration) {
+      conditions.push(`(a.duration_ms ${comparison} ? OR (a.duration_ms = ? AND a.id ${comparison} ?))`);
+      bindings.push(decodedCursor.durationMs, decodedCursor.durationMs, decodedCursor.id);
+    } else {
+      conditions.push(`(a.discovered_at ${comparison} ? OR (a.discovered_at = ? AND a.id ${comparison} ?))`);
+      bindings.push(decodedCursor.discoveredAt, decodedCursor.discoveredAt, decodedCursor.id);
+    }
   }
 
   const sql = `
@@ -61,7 +80,7 @@ export async function listCatalogItems(db, { limit, cursor, query }) {
     FROM video_assets a INDEXED BY idx_video_assets_catalog
     INNER JOIN posts p ON p.id = a.post_id
     WHERE ${conditions.join(' AND ')}
-    ORDER BY a.discovered_at DESC, a.id DESC
+    ORDER BY ${sort.column} ${sort.direction}, a.id ${sort.direction}
     LIMIT ?
   `;
 
@@ -77,7 +96,7 @@ export async function listCatalogItems(db, { limit, cursor, query }) {
     items,
     hasMore,
     nextCursor: hasMore && last
-      ? encodeCursor({ discoveredAt: last.discovered_at, id: last.id })
+      ? encodeCursor({ discoveredAt: last.discovered_at, id: last.id, ...(sort.byDuration ? { durationMs: last.duration_ms } : {}) })
       : null,
   };
 }
@@ -208,4 +227,22 @@ export async function getActiveThumbnailKey(db, id, now = new Date().toISOString
     LIMIT 1
   `).bind(id, now).first();
   return typeof row?.thumbnail_key === 'string' ? row.thumbnail_key : null;
+}
+
+/**
+ * Early deletion: the item leaves the catalog at once (the catalog only lists
+ * rows that have not expired) and the normal retention sweep removes the MEGA
+ * file and the row on its next run. One row write; nothing new to run.
+ * Returns false when the item is unknown, already expired or already being deleted.
+ */
+export async function requestEarlyDeletion(db, id, now = new Date().toISOString()) {
+  const result = await db.prepare(`
+    UPDATE video_assets
+    SET expires_at = ?, updated_at = ?
+    WHERE id = ?
+      AND status IN ('stored', 'clicked')
+      AND uploaded_at IS NOT NULL
+      AND expires_at > ?
+  `).bind(now, now, id, now).run();
+  return Number(result?.meta?.changes ?? 0) > 0;
 }

@@ -15,14 +15,17 @@ function decodeBase64Url(value) {
   return JSON.parse(new TextDecoder().decode(bytes));
 }
 
-export function encodeCursor({ discoveredAt, id }) {
+export function encodeCursor({ discoveredAt, id, durationMs = null }) {
   if (typeof discoveredAt !== 'string' || !Number.isFinite(Date.parse(discoveredAt))) {
     throw new TypeError('Invalid cursor timestamp.');
   }
   if (typeof id !== 'string' || id.length < 1 || id.length > 128) {
     throw new TypeError('Invalid cursor id.');
   }
-  return encodeBase64Url({ discoveredAt, id });
+  if (durationMs !== null && (!Number.isSafeInteger(durationMs) || durationMs < 0)) {
+    throw new TypeError('Invalid cursor duration.');
+  }
+  return encodeBase64Url(durationMs === null ? { discoveredAt, id } : { discoveredAt, id, durationMs });
 }
 
 export function decodeCursor(value) {
@@ -35,7 +38,10 @@ export function decodeCursor(value) {
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
     if (typeof parsed.discoveredAt !== 'string' || !Number.isFinite(Date.parse(parsed.discoveredAt))) return null;
     if (typeof parsed.id !== 'string' || parsed.id.length < 1 || parsed.id.length > 128) return null;
-    return { discoveredAt: parsed.discoveredAt, id: parsed.id };
+    if (parsed.durationMs !== undefined && (!Number.isSafeInteger(parsed.durationMs) || parsed.durationMs < 0)) return null;
+    return parsed.durationMs === undefined
+      ? { discoveredAt: parsed.discoveredAt, id: parsed.id }
+      : { discoveredAt: parsed.discoveredAt, id: parsed.id, durationMs: parsed.durationMs };
   } catch {
     return null;
   }

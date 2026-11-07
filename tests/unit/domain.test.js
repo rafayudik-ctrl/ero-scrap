@@ -53,8 +53,8 @@ test('image-only posts yield no assets and mixed posts yield every video only', 
   assert.deepEqual(selected.map((item) => item.id), ['video-1', 'video-2']);
 });
 
-test('unopened retention is exactly seven days after successful upload', () => {
-  assert.equal(calculateExpiry({ uploadedAt: fixedUpload }), '2026-11-08T12:00:00.000Z');
+test('unopened retention is the configured number of days (default 4) after successful upload', () => {
+  assert.equal(calculateExpiry({ uploadedAt: fixedUpload }), '2026-11-05T12:00:00.000Z');
 });
 
 test('first click changes retention to 24 hours after first click', () => {

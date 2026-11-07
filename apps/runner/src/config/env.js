@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveUnopenedDays } from '../../../../packages/config/src/retention-days.js';
 import { APP_CONFIG } from '../../../../packages/config/src/app.js';
 
 const PROJECT_ROOT = resolve(fileURLToPath(new URL('../../../../', import.meta.url)));
@@ -83,6 +84,7 @@ export function loadRunnerConfig(env = process.env) {
     retentionIntervalMs: APP_CONFIG.retention.sweepIntervalMinutes * 60_000,
     retentionBatchSize: APP_CONFIG.retention.batchSize,
     retentionMaxBatches: APP_CONFIG.retention.maxBatchesPerSweep,
+    unopenedRetentionDays: resolveUnopenedDays(env.UNOPENED_RETENTION_DAYS),
     maintenanceIntervalMs: APP_CONFIG.maintenance.intervalHours * 60 * 60_000,
     ...loadMegaConfig(env),
   });

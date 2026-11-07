@@ -1,4 +1,5 @@
 import { isCopyAuthorized } from '../../../../packages/config/src/security.js';
+import { isValidUnopenedExpiry, MAX_UNOPENED_DAYS } from '../../../../packages/config/src/retention-days.js';
 import { APP_CONFIG } from '../../../../packages/config/src/app.js';
 import { CollectorRepository } from '../repositories/collector-repository.js';
 
@@ -252,8 +253,8 @@ export async function executeCollectorCommand(db, operation, rawPayload, { thumb
       if (durationMs < 1) throw new RangeError('durationMs must be at least 1.');
       const uploadedAt = requireIsoDate(payload.uploadedAt, 'uploadedAt');
       const expiresAt = requireIsoDate(payload.expiresAt, 'expiresAt');
-      if (Date.parse(expiresAt) !== Date.parse(uploadedAt) + APP_CONFIG.retention.unopenedDays * 86_400_000) {
-        throw new TypeError('Unopened media expiry must be exactly seven days after upload.');
+      if (!isValidUnopenedExpiry(uploadedAt, expiresAt)) {
+        throw new TypeError('Unopened media expiry must be a whole number of days (1 to 7) after upload.');
       }
       return repository.completeProcessVideoJob({
         jobId: payload.jobId,
@@ -318,8 +319,8 @@ export async function executeCollectorCommand(db, operation, rawPayload, { thumb
       if (durationMs < 1) throw new RangeError('durationMs must be at least 1.');
       const uploadedAt = requireIsoDate(payload.uploadedAt, 'uploadedAt');
       const expiresAt = requireIsoDate(payload.expiresAt, 'expiresAt');
-      if (Date.parse(expiresAt) !== Date.parse(uploadedAt) + APP_CONFIG.retention.unopenedDays * 24 * 60 * 60 * 1_000) {
-        throw new TypeError('Unopened media expiry must be exactly seven days after upload.');
+      if (!isValidUnopenedExpiry(uploadedAt, expiresAt)) {
+        throw new TypeError('Unopened media expiry must be a whole number of days (1 to 7) after upload.');
       }
       await repository.registerStoredMedia({
         assetId: payload.assetId,
@@ -337,6 +338,7 @@ export async function executeCollectorCommand(db, operation, rawPayload, { thumb
       return repository.pruneStale({
         now: requireIsoDate(payload.now, 'now'),
         continuation: payload.continuation === true,
+        unopenedDays: Number.isInteger(payload.unopenedDays) && payload.unopenedDays >= 1 && payload.unopenedDays <= MAX_UNOPENED_DAYS ? payload.unopenedDays : null,
         retainDays: staleMetadataDays,
         discardedDays: discardedMetadataDays,
         jobRetainDays: finishedJobDays,

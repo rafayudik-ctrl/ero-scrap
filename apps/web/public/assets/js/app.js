@@ -1,4 +1,6 @@
-import { getCatalogPage, getSystemStatus, getOpenActionUrl, resolveApiAssetUrl, login, logout } from './api.js';
+import { getCatalogPage, getSystemStatus, getOpenActionUrl, resolveApiAssetUrl, login, logout, deleteCatalogItem } from './api.js';
+
+const ORDERS = new Set(['recent', 'oldest', 'longest', 'shortest']);
 
 const elements = {
   themeToggle: document.querySelector('#theme-toggle'),
@@ -6,6 +8,7 @@ const elements = {
   apiState: document.querySelector('#api-state'),
   operationMode: document.querySelector('#operation-mode'),
   search: document.querySelector('#catalog-search'),
+  order: document.querySelector('#catalog-order'),
   resultCount: document.querySelector('#result-count'),
   lastScan: document.querySelector('#last-scan'),
   grid: document.querySelector('#catalog-grid'),
@@ -39,6 +42,7 @@ const state = {
   searchController: null,
   searchTimer: null,
   view: 'grid',
+  order: 'recent',
 };
 
 function setTheme(theme) {
@@ -138,9 +142,45 @@ function createVideoCard(item) {
   openButton.setAttribute('aria-label', `Abrir ${title.textContent} no MEGA em nova aba`);
   openForm.append(openButton);
 
-  details.append(title, metadata, expiry, openForm);
+  const deleteButton = document.createElement('button');
+  deleteButton.type = 'button';
+  deleteButton.className = 'delete-video-button';
+  deleteButton.textContent = 'Apagar';
+  deleteButton.setAttribute('aria-label', `Apagar ${title.textContent} antes da data de expiração`);
+  deleteButton.addEventListener('click', () => onDeleteItem(item, article, deleteButton));
+
+  const actions = document.createElement('div');
+  actions.className = 'video-actions';
+  actions.append(openForm, deleteButton);
+
+  details.append(title, metadata, expiry, actions);
   article.append(thumbnail, details);
   return article;
+}
+
+async function onDeleteItem(item, article, button) {
+  const label = item.title || 'este vídeo';
+  if (!window.confirm(`Apagar "${label}" agora? O vídeo sai do catálogo e o arquivo é removido do MEGA em poucos minutos. Isso não pode ser desfeito.`)) return;
+  button.disabled = true;
+  button.textContent = 'Apagando…';
+  try {
+    await deleteCatalogItem(item.id);
+    article.remove();
+    state.loadedCount = Math.max(0, state.loadedCount - 1);
+    elements.resultCount.textContent = `${state.loadedCount} ${state.loadedCount === 1 ? 'item' : 'itens'}`;
+    elements.feedback.textContent = 'Vídeo apagado.';
+    if (elements.grid.childElementCount === 0 && !state.hasMore) {
+      showEmptyState({ title: 'Sua biblioteca está vazia.', description: 'Quando houver novos vídeos armazenados, eles aparecerão aqui.', eyebrow: 'Tudo pronto para começar' });
+    }
+    void loadStatus();
+  } catch (error) {
+    if (needsLogin(error)) { showLogin(true); return; }
+    button.disabled = false;
+    button.textContent = 'Apagar';
+    // 410 means it already expired or is being deleted: the card is stale, so remove it.
+    if (error.status === 410) { article.remove(); elements.feedback.textContent = 'Este vídeo já tinha expirado.'; return; }
+    elements.feedback.textContent = 'Não foi possível apagar agora. Tente novamente.';
+  }
 }
 
 function renderItems(items, { append = false } = {}) {
@@ -221,6 +261,7 @@ async function loadCatalog({ append = false } = {}) {
     const result = await getCatalogPage({
       query: state.query,
       cursor: append ? state.cursor : null,
+      order: state.order,
       signal: controller.signal,
     });
 
@@ -273,7 +314,7 @@ async function loadStatus() {
     if (elements.authStatus) elements.authStatus.textContent = open ? 'Liberado' : 'Bloqueado';
     if (elements.authText) {
       elements.authText.textContent = open
-        ? 'O catálogo mostra somente arquivos já armazenados. O primeiro clique inicia a retenção de 24 horas; itens não abertos expiram em sete dias.'
+        ? 'O catálogo mostra somente arquivos já armazenados. O primeiro clique inicia a retenção de 24 horas; itens não abertos expiram na data indicada em cada cartão.'
         : 'O catálogo mostra somente arquivos já armazenados. A trava de cópia (COPY_AUTHORIZED) está fechada: apenas metadados são coletados.';
     }
     if (result.monitor?.latestScan?.startedAt) {
@@ -340,6 +381,20 @@ function initializeView() {
   setView(savedView);
 }
 
+function initializeOrder() {
+  try {
+    const saved = localStorage.getItem('ero-scrap-order');
+    if (ORDERS.has(saved)) state.order = saved;
+  } catch { /* Storage is optional. */ }
+  elements.order.value = state.order;
+  elements.order.addEventListener('change', () => {
+    if (!ORDERS.has(elements.order.value)) return;
+    state.order = elements.order.value;
+    try { localStorage.setItem('ero-scrap-order', state.order); } catch { /* Storage is optional. */ }
+    void loadCatalog();
+  });
+}
+
 function initializeKeyboardShortcut() {
   const platform = navigator.userAgentData?.platform || navigator.platform || '';
   const isMac = platform.toUpperCase().includes('MAC');
@@ -361,6 +416,7 @@ function initialize() {
     setTheme(nextTheme);
   });
   elements.search.addEventListener('input', onSearchInput);
+  initializeOrder();
   elements.loginForm.addEventListener('submit', onLoginSubmit);
   elements.logoutButton.addEventListener('click', onLogout);
   elements.loadMore.addEventListener('click', () => loadCatalog({ append: true }));

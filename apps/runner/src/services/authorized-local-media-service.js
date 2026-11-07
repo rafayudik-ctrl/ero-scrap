@@ -10,6 +10,7 @@ const MAX_THUMBNAIL_BYTES = APP_CONFIG.media.thumbnailMaxBytes;
  * gate is checked before reading the file or contacting MEGA.
  */
 export class AuthorizedLocalMediaService {
+  #unopenedDays;
   #storage;
   #repository;
   #thumbnailGenerator;
@@ -17,7 +18,8 @@ export class AuthorizedLocalMediaService {
   #logger;
   #now;
 
-  constructor({ storage, repository, mediaInspector, thumbnailGenerator = null, logger = console, now = () => new Date() }) {
+  constructor({ storage, repository, mediaInspector, thumbnailGenerator = null, logger = console, now = () => new Date(), unopenedDays = APP_CONFIG.retention.unopenedDays }) {
+    this.#unopenedDays = unopenedDays;
     if (!storage || typeof storage.uploadLocalFile !== 'function' || typeof storage.deleteObject !== 'function') {
       throw new TypeError('A MEGA-compatible storage provider is required.');
     }
@@ -45,7 +47,7 @@ export class AuthorizedLocalMediaService {
 
     const uploaded = await this.#storage.uploadLocalFile({ assetId, localPath });
     const uploadedAt = uploaded.uploadedAt ?? this.#now().toISOString();
-    const expiresAt = new Date(Date.parse(uploadedAt) + APP_CONFIG.retention.unopenedDays * 24 * 60 * 60 * 1_000).toISOString();
+    const expiresAt = new Date(Date.parse(uploadedAt) + this.#unopenedDays * 24 * 60 * 60 * 1_000).toISOString();
 
     try {
       await this.#repository.registerStoredMedia({

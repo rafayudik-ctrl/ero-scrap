@@ -199,8 +199,8 @@ export class CollectorApiClient {
     return this.#command('retention.fail', { jobId, leaseToken, attempts, errorCode, now });
   }
 
-  async pruneStale({ now = new Date().toISOString(), continuation = false } = {}) {
-    return this.#command('maintenance.prune', { now, continuation });
+  async pruneStale({ now = new Date().toISOString(), continuation = false, unopenedDays = null } = {}) {
+    return this.#command('maintenance.prune', { now, continuation, ...(unopenedDays ? { unopenedDays } : {}) });
   }
 
   async uploadThumbnail(assetId, bytes) {

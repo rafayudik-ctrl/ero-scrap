@@ -730,7 +730,7 @@ export class CollectorRepository {
    * old scan history and finished retention jobs. Stored/clicked/delete_pending
    * videos and dead jobs are never touched.
    */
-  async pruneStale({ now = new Date().toISOString(), retainDays = 14, discardedDays = 3, jobRetainDays = 7, batchSize = 500, continuation = false } = {}) {
+  async pruneStale({ now = new Date().toISOString(), retainDays = 14, discardedDays = 3, jobRetainDays = 7, batchSize = 500, continuation = false, unopenedDays = null } = {}) {
     if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 1_000) {
       throw new RangeError('Prune batch size must be between 1 and 1000.');
     }
@@ -751,6 +751,16 @@ export class CollectorRepository {
         INSERT INTO scan_state (key, value, updated_at) VALUES ('last_prune', ?, ?)
         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
       `, [today, now]);
+    }
+    // A shorter UNOPENED_RETENTION_DAYS also applies to videos stored earlier: unopened
+    // ones get at most uploaded_at + N days. Only changed rows are written.
+    if (!continuation && Number.isInteger(unopenedDays) && unopenedDays >= 1 && unopenedDays <= 7) {
+      const limit = `strftime('%Y-%m-%dT%H:%M:%fZ', uploaded_at, '+${unopenedDays} days')`;
+      await this.#db.run(`
+        UPDATE video_assets SET expires_at = ${limit}, updated_at = ?
+        WHERE status = 'stored' AND first_clicked_at IS NULL AND uploaded_at IS NOT NULL
+          AND expires_at > ${limit}
+      `, [now]);
     }
     const cutoff = new Date(Date.parse(now) - retainDays * 86_400_000).toISOString();
     const discardedCutoff = new Date(Date.parse(now) - discardedDays * 86_400_000).toISOString();
