@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { APP_CONFIG } from '../../../../packages/config/src/app.js';
 import { isCopyAuthorized } from '../../../../packages/config/src/security.js';
+import { isValidListingPage, MIN_LISTING_PAGES, MAX_LISTING_PAGES } from '../../../../packages/config/src/scan-pages.js';
 import { loadSearchKeyword } from '../../../../packages/config/src/keyword-file.js';
 import { DURATION_STATUS, evaluateDuration, matchesSingleKeyword } from '../../../../packages/domain/src/index.js';
 import { parseAlbumPage, parseNewListing } from '../../../../packages/source-erome/src/index.js';
@@ -61,6 +62,7 @@ export class ScanService {
   #repository;
   #keywordFilePath;
   #maxInspections;
+  #listingPages;
   #logger;
   #now;
 
@@ -69,6 +71,7 @@ export class ScanService {
     repository,
     keywordFilePath,
     maxInspections = APP_CONFIG.scan.maxPostInspectionsPerRun,
+    listingPages = APP_CONFIG.scan.maxListingPages,
     logger = console,
     now = () => new Date(),
   }) {
@@ -81,6 +84,10 @@ export class ScanService {
       throw new RangeError('maxInspections must be between 1 and 160.');
     }
 
+    if (!isValidListingPage(listingPages)) {
+      throw new RangeError(`listingPages must be between ${MIN_LISTING_PAGES} and ${MAX_LISTING_PAGES}.`);
+    }
+    this.#listingPages = listingPages;
     this.#source = sourceClient;
     this.#repository = repository;
     this.#keywordFilePath = keywordFilePath;
@@ -106,9 +113,9 @@ export class ScanService {
     let errorCode = null;
 
     try {
-      // Hard-coded page list and source-client guard ensure pages >2 cannot be
-      // requested accidentally through the collector.
-      for (const pageNumber of [1, 2]) {
+      // The page count is bounded (1-6) here and again in the source client, so
+      // deeper pages cannot be requested accidentally through the collector.
+      for (let pageNumber = 1; pageNumber <= this.#listingPages; pageNumber += 1) {
         try {
           const html = await this.#source.fetchNewPage(pageNumber);
           const posts = parseNewListing(html, pageNumber);
@@ -161,7 +168,7 @@ export class ScanService {
       }
 
       if (checked.size > 0) {
-        // Keep only ids still on pages 1-2; everything else can never be requested again.
+        // Keep only ids still on the scanned pages; everything else can never be requested again.
         const nextSeen = listingIds.filter((id) => seen.has(id) || checked.has(id));
         await this.#repository.saveSeenPosts(keywordKey, nextSeen);
       }
@@ -199,7 +206,7 @@ export class ScanService {
 
       await this.#repository.updateEvaluations(evaluations, this.#now().toISOString());
 
-      const status = errorCode || inspectionFailures > 0 || inspectionBacklog > 0 || pagesScanned < 2
+      const status = errorCode || inspectionFailures > 0 || inspectionBacklog > 0 || pagesScanned < this.#listingPages
         ? 'partial'
         : 'succeeded';
       const finishedAt = this.#now().toISOString();

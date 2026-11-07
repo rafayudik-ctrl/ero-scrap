@@ -80,7 +80,7 @@ test('status endpoint reports the copy gate as disabled', { skip: COPY_AUTHORIZE
   const payload = await response.json();
   assert.equal(payload.copyAuthorized, false);
   assert.equal(payload.mode, 'catalog-and-retention');
-  assert.equal(payload.monitor.listingPagesPerScan, 2);
+  assert.equal(payload.monitor.listingPagesPerScan, 4);
   // Counters are folded into the status response: one request instead of two.
   assert.deepEqual(payload.stats, { stored: 0, clicked: 0, unopened: 0, deletionPending: 0 });
 });

@@ -13,7 +13,7 @@ const validEnv = {
 test('runner config uses the fixed keyword file and does not accept an env override', () => {
   const config = loadRunnerConfig({ ...validEnv, SEARCH_KEYWORD_FILE: '/tmp/other-keyword.txt' });
   assert.match(config.keywordFilePath, /config[\\/]search-keyword\.txt$/u);
-  assert.equal(config.scanIntervalMs, 1_200_000);
+  assert.equal(config.scanIntervalMs, 900_000);
   assert.equal(config.maxPostInspectionsPerRun, 160);
   assert.equal(config.collectorApiUrl, validEnv.COLLECTOR_API_URL);
   assert.equal(config.accessClientId, 'access-id');
@@ -62,4 +62,15 @@ test('folder sweep budget defaults to 10, accepts 0 to disable and caps at 200',
   assert.equal(resolveFolderSweepChecks('50'), 50);
   assert.equal(resolveFolderSweepChecks('999'), 200);
   assert.equal(loadRunnerConfig(validEnv).folderSweepChecks, 10);
+});
+
+test('listing depth defaults to 4 pages, accepts 1-6 and rejects anything else', async () => {
+  const { resolveListingPages } = await import('../../../packages/config/src/scan-pages.js');
+  assert.equal(resolveListingPages(undefined), 4);
+  assert.equal(resolveListingPages(''), 4);
+  assert.equal(resolveListingPages('1'), 1);
+  assert.equal(resolveListingPages(' 6 '), 6);
+  for (const bad of ['0', '7', '2.5', 'abc', '-1']) assert.throws(() => resolveListingPages(bad), RangeError);
+  assert.equal(loadRunnerConfig(validEnv).listingPages, 4);
+  assert.equal(loadRunnerConfig({ ...validEnv, SCAN_LISTING_PAGES: '3' }).listingPages, 3);
 });

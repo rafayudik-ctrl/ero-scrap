@@ -3,8 +3,9 @@ export const APP_CONFIG = Object.freeze({
   stage: 3,
   stageName: 'private-catalog-and-retention',
   scan: Object.freeze({
-    intervalMinutes: 20,
-    maxListingPages: 2,
+    intervalMinutes: 15,
+    // Default pages of the New tab read per scan; SCAN_LISTING_PAGES (1-6) overrides it.
+    maxListingPages: 4,
     maxPostsPerPage: 80,
     maxPostInspectionsPerRun: 160,
     minimumRequestDelayMs: 1_500,

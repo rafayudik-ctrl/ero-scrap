@@ -242,9 +242,9 @@ Não existe campo de edição na interface nem valor em D1.
 
 ## 11. Ativar o agendamento do GitHub Actions
 
-O arquivo `.github/workflows/automation.yml` agenda execuções nos minutos `7, 17, 27, 37, 47, 57` de cada hora (UTC), isto é, a cada dez minutos. Cada execução tem **dois jobs independentes**:
+O arquivo `.github/workflows/automation.yml` agenda execuções nos minutos `7, 22, 37, 52` de cada hora (UTC), isto é, a cada 15 minutos. Cada execução tem **dois jobs independentes**:
 
-- **scan** (cerca de 1 minuto): lê as duas primeiras páginas de "New", grava metadados e, uma vez por dia (03:00–03:59 UTC), faz a limpeza de metadados antigos. Não instala dependências nem usa MEGA.
+- **scan** (cerca de 1 minuto): lê as primeiras páginas de "New" (4 por padrão, configurável), grava metadados e, uma vez por dia (03:00–03:59 UTC), faz a limpeza de metadados antigos. Não instala dependências nem usa MEGA.
 - **storage**: consulta (somente leitura) se há vídeo elegível ou exclusão vencida. Só quando existe trabalho ele instala FFmpeg e MEGAcmd, entra no MEGA, processa **no máximo um vídeo** e aplica a retenção. Se não há nada a fazer, termina em segundos.
 
 Como os dois jobs têm filas de concorrência separadas, um download demorado no job `storage` **não atrasa** a próxima varredura. O workflow `keepalive.yml` roda uma vez por semana e reativa os workflows agendados, para o GitHub não desligá-los após 60 dias sem atividade no repositório público.
@@ -320,7 +320,7 @@ Os valores acima vêm da documentação pública da Cloudflare no momento desta 
 
 ### Agendamento
 
-O GitHub schedule é best-effort: pode atrasar ou perder execuções em períodos de carga, e só roda a partir da branch padrão. A concorrência impede dois jobs do mesmo tipo de trabalharem simultaneamente; execuções sobrepostas podem esperar/coalescer. Portanto, “a cada dez minutos” é a cadência configurada, não uma garantia em tempo real.
+O GitHub schedule é best-effort: pode atrasar ou perder execuções em períodos de carga, e só roda a partir da branch padrão. A concorrência impede dois jobs do mesmo tipo de trabalharem simultaneamente; execuções sobrepostas podem esperar/coalescer. Portanto, “a cada 15 minutos” é a cadência configurada, não uma garantia em tempo real.
 
 ### MEGA e dados
 
@@ -348,11 +348,11 @@ Nunca edite a cópia de `COPY_AUTHORIZED` em `.env`, secret ou Pages variable: e
 - **Mantenha `config/search-keyword.txt` vazio** e use o secret `SEARCH_KEYWORD`.
 - Em Settings → Actions → General → *Fork pull request workflows*, deixe a aprovação obrigatória para colaboradores externos. Os workflows de CI não usam nenhum secret.
 - O catálogo continua privado: a API exige a senha do site (ou o Cloudflare Access); o código público não dá acesso aos dados.
-- Se você não quiser expor nem o código, a alternativa é repositório privado, mas então os 2.000 minutos mensais não bastam para varrer a cada dez minutos.
+- Se você não quiser expor nem o código, a alternativa é repositório privado, mas então os 2.000 minutos mensais não bastam para varrer a cada 15 minutos.
 
 ## 17. Agendamento: escolha quem dispara o workflow
 
-O workflow processa tudo a cada 20 minutos, mas **quem o dispara** pode ser escolhido. Todas as opções são grátis e sem cartão, e a única trava continua sendo `COPY_AUTHORIZED` (o disparo usa sempre o modo `auto`).
+O workflow processa tudo a cada 15 minutos, mas **quem o dispara** pode ser escolhido. Todas as opções são grátis e sem cartão, e a única trava continua sendo `COPY_AUTHORIZED` (o disparo usa sempre o modo `auto`).
 
 | Opção | Pontualidade | Esforço |
 |---|---|---|
@@ -372,7 +372,7 @@ O `schedule` do GitHub **não garante horário**: em horários de pico ele atras
 
 ### 17.2 Opção A: Worker agendador na Cloudflare
 
-O Worker (`workers/scheduler/src/index.js`) faz **uma requisição a cada 20 minutos** e nada mais: sem banco, sem estado, sem dependências. Usa um milissegundo de CPU e poucos KB de RAM, e o plano grátis permite 100.000 execuções por dia.
+O Worker (`workers/scheduler/src/index.js`) faz **uma requisição a cada 15 minutos** e nada mais: sem banco, sem estado, sem dependências. Usa um milissegundo de CPU e poucos KB de RAM, e o plano grátis permite 100.000 execuções por dia.
 
 **Pelo painel (sem instalar nada):**
 
@@ -382,7 +382,7 @@ O Worker (`workers/scheduler/src/index.js`) faz **uma requisição a cada 20 min
    - `GITHUB_REPO` (texto) = `seu-usuario/seu-repositorio`
    - `GITHUB_TOKEN` (**Secret**) = o token do passo 17.1
    - Opcionais: `GITHUB_REF` (padrão `main`) e `WORKFLOW_FILE` (padrão `automation.yml`).
-4. Settings → **Trigger Events** → Add → **Cron Triggers** → `3,23,43 * * * *`.
+4. Settings → **Trigger Events** → Add → **Cron Triggers** → `3,18,33,48 * * * *`.
 5. Settings → Domains & Routes: deixe o `workers.dev` **desligado** (o Worker não precisa de endereço público).
 
 **Pela linha de comando:** edite `GITHUB_REPO` em `workers/scheduler/wrangler.jsonc`, depois `cd workers/scheduler`, `npx wrangler deploy` e `npx wrangler secret put GITHUB_TOKEN`.
@@ -393,7 +393,7 @@ O Worker (`workers/scheduler/src/index.js`) faz **uma requisição a cada 20 min
 
 ### 17.3 Opção B: cron-job.org (sem código)
 
-1. Em https://cron-job.org (grátis, sem cartão) crie um cron job a cada 20 minutos.
+1. Em https://cron-job.org (grátis, sem cartão) crie um cron job a cada 15 minutos.
 2. URL: `https://api.github.com/repos/SEU_USUARIO/SEU_REPO/actions/workflows/automation.yml/dispatches`, método `POST`.
 3. Cabeçalhos: `Authorization: Bearer SEU_TOKEN`, `Accept: application/vnd.github+json`, `User-Agent: ero-scrap`.
 4. Corpo: `{"ref":"main","inputs":{"mode":"auto"}}`. Resposta esperada: `204`.
@@ -430,7 +430,7 @@ Uso esperado: cerca de 7 escritas por scan (cerca de 500 por dia, sem contar os 
 
 **Ordenar:** ao lado da busca há um seletor com **Mais recentes**, **Mais antigos**, **Maior duração** e **Menor duração**. A escolha fica lembrada no navegador.
 
-**Apagar antes do prazo:** cada cartão tem o botão **Apagar** (pede confirmação). O vídeo some do catálogo na hora e o arquivo é removido do MEGA na próxima execução do workflow (até cerca de 20 minutos). É uma única escrita no D1; o próprio processo de retenção que já existia faz a remoção.
+**Apagar antes do prazo:** cada cartão tem o botão **Apagar** (pede confirmação). O vídeo some do catálogo na hora e o arquivo é removido do MEGA na próxima execução do workflow (até cerca de 15 minutos). É uma única escrita no D1; o próprio processo de retenção que já existia faz a remoção.
 
 **Dias de retenção (vídeos que ninguém abriu):** o padrão agora é **4 dias**. Para mudar sem editar código (de 1 a 7):
 
@@ -448,3 +448,16 @@ Vale para os vídeos novos. Se você **diminuir** o valor, os vídeos já guarda
 Para as pastas vazias que já existem, cada execução que apagou algo inspeciona uma **amostra aleatória** de pastas (padrão 10) e remove as vazias. O custo por execução é fixo (1 listagem + até 10 consultas), por maior que seja o número de pastas. Para limpar um acúmulo grande mais rápido, crie a variável de repositório `MEGA_EMPTY_FOLDER_SWEEP_CHECKS` (por exemplo `100`, máximo 200) e volte para `10` ou apague a variável depois; `0` desliga. O log mostra `folderSweep: { listed, checked, removed }`.
 
 **Ícone:** `favicon.svg` (disco azul com play e um arco dourado de "tempo", como a contagem de 24 horas). O mesmo desenho aparece no cabeçalho do site e acompanha o tema claro/escuro.
+
+## 21. Intervalo de 15 minutos e quantidade de páginas
+
+O padrão agora é **4 páginas da aba New a cada 15 minutos** (mais leve que 2 páginas a cada 8 min ou 3 a cada 12 min: menos execuções por dia, menos escritas no D1 e menos CPU no runner).
+
+**Páginas:** configuráveis sem editar código. Em Settings → Secrets and variables → Actions → **Variables**, crie `SCAN_LISTING_PAGES` com um número de 1 a 6 (vazio = 4). Há um teto de segurança em 6; passar disso é recusado em todas as camadas (runner, cliente do Erome, API).
+
+**Minutos:** o intervalo vem de quem dispara o workflow.
+- **Cloudflare (recomendado):** em `workers/scheduler/wrangler.jsonc` o cron é `3,18,33,48 * * * *`. Se você criou o gatilho pelo painel, troque em Settings → Trigger Events → Cron Triggers para `3,18,33,48 * * * *` ou, se fez deploy por linha de comando, rode o deploy de novo.
+- **GitHub (opção reserva):** `.github/workflows/automation.yml` agora usa `7,22,37,52 * * * *` e continua sendo ignorado quando `EXTERNAL_SCHEDULER` é `true`.
+- Para outro intervalo use minutos que dividam 60 por igual (10, 12, 15, 20, 30). Evite `*/8`: deixa um intervalo de 4 min na virada da hora.
+
+Com mais páginas, a primeira varredura depois de trocar a palavra-chave pode ter mais posts novos para inspecionar (limite de 160 por execução; o restante continua na próxima).

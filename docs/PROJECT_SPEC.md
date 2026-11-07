@@ -10,8 +10,8 @@ Existe exatamente uma palavra/frase ativa em `config/search-keyword.txt`, uma li
 
 ## Descoberta
 
-- Fonte: aba pública New; somente páginas 1 e 2.
-- A cada dez minutos no modo contínuo.
+- Fonte: aba pública New; somente as primeiras páginas (padrão 1–4, máx. 6).
+- A cada 15 minutos no modo contínuo.
 - Post só com imagens: ignorado.
 - Post misto: imagens ignoradas; cada vídeo é uma entidade independente.
 - Duração elegível: `0 < duration_ms <= 600000` e explicitamente confirmada.

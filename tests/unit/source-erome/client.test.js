@@ -9,7 +9,7 @@ function htmlResponse(body, status = 200, headers = {}) {
   });
 }
 
-test('client requests exactly the first and second New pages', async () => {
+test('client requests only New pages 1-6, with the page query for 2 and beyond', async () => {
   const urls = [];
   const client = new EromeClient({
     minimumDelayMs: 0,
@@ -24,8 +24,12 @@ test('client requests exactly the first and second New pages', async () => {
   assert.equal(new URL(urls[0]).pathname, '/explore/new');
   assert.equal(new URL(urls[0]).search, '');
   assert.equal(new URL(urls[1]).searchParams.get('page'), '2');
-  await assert.rejects(() => client.fetchNewPage(3), /first two New pages/);
-  assert.equal(urls.length, 2);
+  await client.fetchNewPage(4);
+  assert.equal(new URL(urls[2]).searchParams.get('page'), '4');
+  await assert.rejects(() => client.fetchNewPage(7), /New pages 1-6/);
+  await assert.rejects(() => client.fetchNewPage(0), /New pages 1-6/);
+  await assert.rejects(() => client.fetchNewPage(2.5), /New pages 1-6/);
+  assert.equal(urls.length, 3);
 });
 
 test('client accepts only canonical public Erome album URLs', async () => {

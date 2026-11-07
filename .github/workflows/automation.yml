@@ -8,9 +8,9 @@ name: Ero-Scrap automation
 
 on:
   schedule:
-    # Every 20 minutes, deliberately offset from the top of the hour (GitHub drops
+    # Every 15 minutes, deliberately offset from the top of the hour (GitHub drops
     # or delays schedules at :00 and :30 when its queue is busy).
-    - cron: '7,27,47 * * * *'
+    - cron: '7,22,37,52 * * * *'
   workflow_dispatch:
     inputs:
       mode:
@@ -39,6 +39,8 @@ env:
   SEARCH_KEYWORD: ${{ secrets.SEARCH_KEYWORD }}
   # Days an unopened video stays stored (1-7). Empty = the default in packages/config/src/app.js (4).
   UNOPENED_RETENTION_DAYS: ${{ vars.UNOPENED_RETENTION_DAYS }}
+  # Pages of the public New tab read per scan (1-6). Empty = the default in packages/config/src/app.js (4).
+  SCAN_LISTING_PAGES: ${{ vars.SCAN_LISTING_PAGES }}
   # Existing MEGA folders inspected per retention pass to remove empty leftovers (default 10, 0 = off, max 200).
   MEGA_EMPTY_FOLDER_SWEEP_CHECKS: ${{ vars.MEGA_EMPTY_FOLDER_SWEEP_CHECKS }}
 

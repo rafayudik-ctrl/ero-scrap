@@ -1,3 +1,4 @@
+import { isValidListingPage, MIN_LISTING_PAGES, MAX_LISTING_PAGES } from '../../config/src/scan-pages.js';
 import { extractElements, getAttribute } from './html.js';
 import { normalizeAlbumUrl, normalizePostTitle } from './normalizers.js';
 
@@ -14,8 +15,8 @@ function hasClass(attributes, expected) {
  * every card that follows it.
  */
 export function parseNewListing(html, pageNumber) {
-  if (pageNumber !== 1 && pageNumber !== 2) {
-    throw new RangeError('The Erome collector is restricted to the first two New pages.');
+  if (!isValidListingPage(pageNumber)) {
+    throw new RangeError(`The Erome collector is restricted to New pages ${MIN_LISTING_PAGES}-${MAX_LISTING_PAGES}.`);
   }
   if (typeof html !== 'string' || html.length === 0) {
     throw new TypeError('Listing HTML must be a non-empty string.');

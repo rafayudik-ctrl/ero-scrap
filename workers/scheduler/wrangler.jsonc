@@ -8,7 +8,7 @@
   "preview_urls": false,
   "triggers": {
     // Exact schedule (Cloudflare does not delay it): minutes 3, 23 and 43 of every hour.
-    "crons": ["3,23,43 * * * *"]
+    "crons": ["3,18,33,48 * * * *"]
   },
   "vars": {
     // CHANGE THIS to your user/repository, e.g. "maria/ero-scrap".

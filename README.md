@@ -6,9 +6,9 @@ Sistema pessoal de monitoramento de publicações recentes, com catálogo privad
 
 ## Objetivo e regras
 
-- Consultar somente as páginas 1 e 2 da aba `New`, com cadência configurada de dez minutos.
+- Consultar somente as primeiras páginas da aba `New` (4 por padrão, de 1 a 6 via `SCAN_LISTING_PAGES`), com cadência configurada de 15 minutos.
 - Ler uma única palavra/frase do secret `SEARCH_KEYWORD` (recomendado em repositório público) ou, se ele não existir, de `config/search-keyword.txt`; o post corresponde quando o termo aparece no título **OU** em qualquer tag.
-- Inspecionar cada post encontrado nas duas páginas; um post pode conter vários vídeos e imagens.
+- Inspecionar cada post encontrado nas páginas consultadas; um post pode conter vários vídeos e imagens.
 - Ignorar posts somente com imagens e ignorar imagens em posts mistos.
 - Aceitar vídeos somente quando a duração é explicitamente conhecida e `0 < duração <= 600000 ms` (10 minutos).
 - Identificar cada vídeo individualmente, evitar duplicados e processar uma tarefa por vez.
@@ -43,7 +43,7 @@ Siga **[docs/CLOUD_DEPLOYMENT.md](docs/CLOUD_DEPLOYMENT.md)**. O guia cobre GitH
 Resumo dos workflows:
 
 - `CI`: valida sintaxe, bundle Pages Functions e testes em push/PR.
-- `Ero-Scrap automation`: agenda a cada dez minutos em dois jobs independentes (`scan` e `storage`), então um download longo não atrasa a varredura. Com a trava fechada, coleta metadados e consulta D1 para saber se há exclusões vencidas; só instala/autentica o MEGAcmd quando há algo a excluir e as credenciais estão configuradas. Com a trava deliberadamente aberta, revalida, consulta a fila no D1 e só instala MEGAcmd/FFmpeg quando existe vídeo ou exclusão vencida; processa no máximo um vídeo por runner efêmero.
+- `Ero-Scrap automation`: agenda a cada 15 minutos em dois jobs independentes (`scan` e `storage`), então um download longo não atrasa a varredura. Com a trava fechada, coleta metadados e consulta D1 para saber se há exclusões vencidas; só instala/autentica o MEGAcmd quando há algo a excluir e as credenciais estão configuradas. Com a trava deliberadamente aberta, revalida, consulta a fila no D1 e só instala MEGAcmd/FFmpeg quando existe vídeo ou exclusão vencida; processa no máximo um vídeo por runner efêmero.
 - `Apply Cloudflare D1 migrations`: aplicação manual de migrations em produção.
 
 ## Desenvolvimento e testes
@@ -66,7 +66,7 @@ Para desenvolvimento local, consulte [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 - Miniaturas privadas (D1 ou bucket R2 privado); URL MEGA não aparece no JSON público do catálogo.
 - 401/403, redirects e hosts fora da allowlist interrompem o downloader sem fallback de acesso; 429 é reagendado.
 - GitHub Actions schedule é best-effort, não um relógio de tempo real. Jobs podem atrasar ou ser coalescidos quando houver execução sobreposta.
-- O cron a cada 20 minutos executa cerca de 2.160 jobs/mês. Para pontualidade real há um agendador opcional grátis em `workers/scheduler/` (Cloudflare Cron Trigger, sem cartão); veja a seção 17 de `docs/CLOUD_DEPLOYMENT.md`. A verificação de retenção é feita dentro do mesmo job, sem um cron extra. Em repositório **público** os minutos de Actions são gratuitos e ilimitados; em um privado, a franquia gratuita de 2.000 min/mês não comporta esse ritmo. O workflow `keepalive` reativa os agendamentos semanalmente para o GitHub não desligá-los após 60 dias sem atividade.
+- O cron a cada 15 minutos executa cerca de 2.880 jobs/mês. Para pontualidade real há um agendador opcional grátis em `workers/scheduler/` (Cloudflare Cron Trigger, sem cartão); veja a seção 17 de `docs/CLOUD_DEPLOYMENT.md`. A verificação de retenção é feita dentro do mesmo job, sem um cron extra. Em repositório **público** os minutos de Actions são gratuitos e ilimitados; em um privado, a franquia gratuita de 2.000 min/mês não comporta esse ritmo. O workflow `keepalive` reativa os agendamentos semanalmente para o GitHub não desligá-los após 60 dias sem atividade.
 
 ## Documentação
 

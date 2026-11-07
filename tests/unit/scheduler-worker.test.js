@@ -54,10 +54,10 @@ test('the token never reaches the logs', async () => {
   assert.ok(lines.every((line) => !line.includes(TOKEN)));
 });
 
-test('the Worker exposes no public surface and the cron is exact and every 20 minutes', async () => {
+test('the Worker exposes no public surface and the cron is exact and every 15 minutes', async () => {
   assert.equal((await worker.fetch()).status, 404);
   const config = await readFile('workers/scheduler/wrangler.jsonc', 'utf8');
-  assert.match(config, /"crons": \["3,23,43 \* \* \* \*"\]/u);
+  assert.match(config, /"crons": \["3,18,33,48 \* \* \* \*"\]/u);
   assert.match(config, /"workers_dev": false/u);
   assert.doesNotMatch(config, /github_pat_|ghp_/u);
 });
@@ -66,5 +66,5 @@ test('GitHub schedule is skipped in both jobs only when EXTERNAL_SCHEDULER is tr
   const wf = await readFile('.github/workflows/automation.yml', 'utf8');
   const matches = wf.match(/github\.event_name != 'schedule' \|\| vars\.EXTERNAL_SCHEDULER != 'true'/gu) ?? [];
   assert.equal(matches.length, 2);
-  assert.match(wf, /cron: '7,27,47 \* \* \* \*'/u, 'GitHub schedule remains as an option');
+  assert.match(wf, /cron: '7,22,37,52 \* \* \* \*'/u, 'GitHub schedule remains as an option');
 });

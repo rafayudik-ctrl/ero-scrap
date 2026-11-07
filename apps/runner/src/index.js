@@ -68,6 +68,7 @@ export function createRunner({ env = process.env, fetchImpl = globalThis.fetch, 
     repository,
     keywordFilePath: config.keywordFilePath,
     maxInspections: config.maxPostInspectionsPerRun,
+    listingPages: config.listingPages,
     logger,
   });
 

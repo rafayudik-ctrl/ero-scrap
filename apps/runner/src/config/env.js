@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveUnopenedDays } from '../../../../packages/config/src/retention-days.js';
+import { resolveListingPages } from '../../../../packages/config/src/scan-pages.js';
 import { APP_CONFIG } from '../../../../packages/config/src/app.js';
 
 const PROJECT_ROOT = resolve(fileURLToPath(new URL('../../../../', import.meta.url)));
@@ -95,6 +96,7 @@ export function loadRunnerConfig(env = process.env) {
     retentionBatchSize: APP_CONFIG.retention.batchSize,
     retentionMaxBatches: APP_CONFIG.retention.maxBatchesPerSweep,
     unopenedRetentionDays: resolveUnopenedDays(env.UNOPENED_RETENTION_DAYS),
+    listingPages: resolveListingPages(env.SCAN_LISTING_PAGES),
     folderSweepChecks: resolveFolderSweepChecks(env.MEGA_EMPTY_FOLDER_SWEEP_CHECKS),
     maintenanceIntervalMs: APP_CONFIG.maintenance.intervalHours * 60 * 60_000,
     ...loadMegaConfig(env),

@@ -13,9 +13,9 @@
 
 Em produção, a retenção não depende de processo residente nem de computador pessoal:
 
-- Com `COPY_AUTHORIZED = true`, cada execução `full` a cada dez minutos também processa a fila de retenção.
+- Com `COPY_AUTHORIZED = true`, cada execução `full` a cada 15 minutos também processa a fila de retenção.
 - Com a trava `false`, a execução `metadata` consulta D1 no mesmo runner para saber se há exclusões vencidas. Só instala e autentica o MEGAcmd se existir trabalho e as credenciais estiverem configuradas.
-- Não existe cron de limpeza separado; a verificação ocorre no mesmo job de dez minutos, evitando 720 jobs adicionais por mês.
+- Não existe cron de limpeza separado; a verificação ocorre no mesmo job de 15 minutos, evitando 720 jobs adicionais por mês.
 - A exclusão ocorre no primeiro runner que confirmar um item vencido e conseguir autenticar no MEGA; a latência normal é até uma cadência do workflow, mais eventual atraso do GitHub Actions.
 - O modo manual `cleanup` executa somente a limpeza, sem habilitar cópia.
 

@@ -2,7 +2,7 @@
 // GitHub Actions workflow on time. Cloudflare Cron Triggers are exact and free
 // (no credit card), unlike GitHub's own `schedule`, which delays or drops runs.
 //
-// One outgoing request every 20 minutes, no database, no stored state, no
+// One outgoing request every 15 minutes, no database, no stored state, no
 // dependencies. It is a single file so it can also be pasted into the
 // Cloudflare dashboard editor. COPY_AUTHORIZED stays the only lock: this
 // Worker always asks for mode "auto", which the workflow resolves from it.

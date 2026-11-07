@@ -1,4 +1,4 @@
-# Estado atual — Ero-Scrap 0.5.3
+# Estado atual — Ero-Scrap 0.5.4
 
 ## Entregue em código
 
@@ -13,7 +13,7 @@
 - Revalidação da palavra-chave, álbum público, ID individual e duração antes de qualquer transferência.
 - Trava `COPY_AUTHORIZED = false`, verificada no runner, downloader, adaptador MEGA e Worker. Com a trava fechada, nenhum pedido de bytes de vídeo nem upload ocorre.
 - GitHub Actions com runners efêmeros Ubuntu 24.04 como executor; Cloudflare Pages Functions/D1/R2 para site, API, dados e miniaturas.
-- Workflow de dez minutos com consulta barata de trabalho pendente; MEGAcmd só é instalado/autenticado quando existe upload ou exclusão vencida; FFmpeg só é instalado quando existe vídeo na fila.
+- Workflow de 15 minutos com consulta barata de trabalho pendente; MEGAcmd só é instalado/autenticado quando existe upload ou exclusão vencida; FFmpeg só é instalado quando existe vídeo na fila.
 - Tutorial de implantação sem computador/servidor próprio ligado em `CLOUD_DEPLOYMENT.md`, usando GitHub Codespaces apenas para preparar o repositório, GitHub Actions para execução e Cloudflare Pages para hospedagem.
 
 ## Validação realizada nesta sessão

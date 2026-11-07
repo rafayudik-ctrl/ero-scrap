@@ -126,7 +126,7 @@ async function withKeyword(contents, run) {
 // A matching, short-enough video is 'eligible' when the gate is open and 'copy_blocked' when closed.
 const CANDIDATE = COPY_AUTHORIZED ? 'eligible' : 'copy_blocked';
 
-test('scan checks only New pages 1 and 2 and matches title OR tags', async () => {
+test('scan reads exactly the configured New pages and matches title OR tags', async () => {
   await withKeyword('needle', async (keywordFilePath) => {
     const fetchedPages = [];
     const fetchedAlbums = [];
@@ -147,6 +147,7 @@ test('scan checks only New pages 1 and 2 and matches title OR tags', async () =>
     const logs = [];
     const service = new ScanService({
       sourceClient,
+      listingPages: 2,
       repository,
       keywordFilePath,
       logger: { info: (...values) => logs.push(values), error() {} },
@@ -245,6 +246,7 @@ test('scan accepts a valid empty second New page', async () => {
         async fetchAlbum(url) { return albumPages.get(new URL(url).pathname); },
       },
       repository,
+      listingPages: 2,
       keywordFilePath,
       logger: { info() {} },
     });
@@ -301,5 +303,69 @@ test('a quiet scan writes nothing to the database besides the scan record', asyn
     await service.runOnce();
     assert.deepEqual(writes.filter((name) => name !== 'updateEvaluations'), []);
     assert.equal(repository.seenWrites, seenWritesBefore);
+  });
+});
+
+
+test('scan reads 4 New pages by default and stops cleanly at the configured depth', async () => {
+  await withKeyword('needle', async (keywordFilePath) => {
+    const run = async (listingPages) => {
+      const requestedPages = [];
+      const service = new ScanService({
+        sourceClient: {
+          async fetchNewPage(pageNumber) {
+            requestedPages.push(pageNumber);
+            return pageNumber === 1 ? listingPage1 : '<div id="albums"></div>';
+          },
+          async fetchAlbum(url) { return albumPages.get(new URL(url).pathname); },
+        },
+        repository: new FakeRepository(),
+        keywordFilePath,
+        logger: { info() {} },
+        ...(listingPages ? { listingPages } : {}),
+      });
+      const result = await service.runOnce();
+      return { requestedPages, result };
+    };
+
+    const byDefault = await run();
+    assert.deepEqual(byDefault.requestedPages, [1, 2, 3, 4]);
+    assert.equal(byDefault.result.pagesScanned, 4);
+    assert.equal(byDefault.result.status, 'succeeded');
+
+    const three = await run(3);
+    assert.deepEqual(three.requestedPages, [1, 2, 3]);
+    assert.equal(three.result.pagesScanned, 3);
+  });
+});
+
+test('scan is partial when a later page fails, and rejects an invalid page depth', async () => {
+  await withKeyword('needle', async (keywordFilePath) => {
+    const warnings = [];
+    const service = new ScanService({
+      sourceClient: {
+        async fetchNewPage(pageNumber) {
+          if (pageNumber === 3) throw Object.assign(new Error('boom'), { code: 'http_error', status: 503 });
+          return pageNumber === 1 ? listingPage1 : '<div id="albums"></div>';
+        },
+        async fetchAlbum(url) { return albumPages.get(new URL(url).pathname); },
+      },
+      repository: new FakeRepository(),
+      keywordFilePath,
+      logger: { info() {}, warn(message, details) { warnings.push(details); } },
+    });
+    const result = await service.runOnce();
+    assert.equal(result.pagesScanned, 2);
+    assert.equal(result.status, 'partial');
+    assert.deepEqual(warnings.find((entry) => entry.page === 3)?.httpStatus, 503);
+
+    for (const listingPages of [0, 7, 2.5]) {
+      assert.throws(() => new ScanService({
+        sourceClient: { fetchNewPage() {}, fetchAlbum() {} },
+        repository: new FakeRepository(),
+        keywordFilePath,
+        listingPages,
+      }), RangeError);
+    }
   });
 });

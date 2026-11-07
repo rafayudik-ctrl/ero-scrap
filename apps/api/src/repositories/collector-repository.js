@@ -1,5 +1,6 @@
 import { normalizeText, normalizeTag } from '../../../../packages/domain/src/normalization.js';
 import { APP_CONFIG } from '../../../../packages/config/src/app.js';
+import { MAX_LISTING_PAGES, MAX_LISTED_POSTS } from '../../../../packages/config/src/scan-pages.js';
 
 const D1_MAX_BOUND_PARAMETERS = 100;
 const POSTS_PER_INSERT = 12; // 12 × 8 bound values = 96.
@@ -89,7 +90,7 @@ export class CollectorRepository {
 
   async saveSeenPosts(keywordKey, ids, now = new Date().toISOString()) {
     await this.#ensureStateTable();
-    const value = JSON.stringify({ keywordKey, ids: ids.filter(isValidPostId).slice(0, 400) });
+    const value = JSON.stringify({ keywordKey, ids: ids.filter(isValidPostId).slice(0, MAX_LISTED_POSTS) });
     await this.#db.run(`
       INSERT INTO scan_state (key, value, updated_at) VALUES ('seen_posts', ?, ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
@@ -121,8 +122,8 @@ export class CollectorRepository {
   }) {
     const validStatuses = new Set(['succeeded', 'partial', 'failed', 'skipped']);
     if (!validStatuses.has(status)) throw new TypeError('Invalid scan status.');
-    if (!Number.isInteger(pagesScanned) || pagesScanned < 0 || pagesScanned > 2) {
-      throw new RangeError('pagesScanned must be between zero and two.');
+    if (!Number.isInteger(pagesScanned) || pagesScanned < 0 || pagesScanned > MAX_LISTING_PAGES) {
+      throw new RangeError(`pagesScanned must be between zero and ${MAX_LISTING_PAGES}.`);
     }
 
     await this.#db.run(`
@@ -174,7 +175,7 @@ export class CollectorRepository {
   }
 
   /**
-   * Inspect only posts still present on New pages 1 and 2. Posts that have
+   * Inspect only posts still present on the scanned New pages. Posts that have
    * fallen off those pages are deliberately not crawled later.
    */
   async getPendingInspection(postIds, limit, keyword) {

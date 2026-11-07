@@ -27,10 +27,10 @@ test('New listing extracts only paired album-link and album-title cards', async 
   ]);
 });
 
-test('listing parser hard-rejects page numbers beyond the first two', async () => {
+test('listing parser hard-rejects page numbers beyond the sixth', async () => {
   const html = await fixture('new-page-2.html');
   assert.equal(parseNewListing(html, 2)[0].id, 'IjKl9012');
-  assert.throws(() => parseNewListing(html, 3), /first two New pages/);
+  assert.throws(() => parseNewListing(html, 7), /New pages 1-6/);
 });
 
 test('album parser keeps videos only and preserves each video duration independently', async () => {

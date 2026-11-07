@@ -1,9 +1,10 @@
 import { isCopyAuthorized } from '../../../../packages/config/src/security.js';
 import { isValidUnopenedExpiry, MAX_UNOPENED_DAYS } from '../../../../packages/config/src/retention-days.js';
 import { APP_CONFIG } from '../../../../packages/config/src/app.js';
+import { isValidListingPage, MIN_LISTING_PAGES, MAX_LISTING_PAGES, MAX_LISTED_POSTS } from '../../../../packages/config/src/scan-pages.js';
 import { CollectorRepository } from '../repositories/collector-repository.js';
 
-const MAX_IDS = 160;
+const MAX_IDS = MAX_LISTED_POSTS;
 const MAX_POST_BATCH = 160;
 const MAX_VIDEO_BATCH = 5_000;
 const POST_ID_PATTERN = /^[A-Za-z0-9_-]{4,64}$/u;
@@ -65,8 +66,8 @@ function sanitizeListingPosts(value) {
     if (typeof post.title !== 'string' || post.title.length < 1 || post.title.length > 300) {
       throw new TypeError('post.title must contain between 1 and 300 characters.');
     }
-    if (post.pageNumber !== 1 && post.pageNumber !== 2) {
-      throw new RangeError('post.pageNumber must be 1 or 2.');
+    if (!isValidListingPage(post.pageNumber)) {
+      throw new RangeError(`post.pageNumber must be between ${MIN_LISTING_PAGES} and ${MAX_LISTING_PAGES}.`);
     }
 
     return {
@@ -172,8 +173,8 @@ export async function executeCollectorCommand(db, operation, rawPayload, { thumb
         finishedAt: requireIsoDate(payload.finishedAt, 'finishedAt'),
         status: payload.status,
         pagesScanned: requireNonNegativeInteger(payload.pagesScanned, 'pagesScanned', 2),
-        postsSeen: requireNonNegativeInteger(payload.postsSeen, 'postsSeen', MAX_POST_BATCH),
-        matchingPosts: requireNonNegativeInteger(payload.matchingPosts, 'matchingPosts', MAX_POST_BATCH),
+        postsSeen: requireNonNegativeInteger(payload.postsSeen, 'postsSeen', MAX_LISTED_POSTS),
+        matchingPosts: requireNonNegativeInteger(payload.matchingPosts, 'matchingPosts', MAX_LISTED_POSTS),
         videoCandidates: requireNonNegativeInteger(payload.videoCandidates, 'videoCandidates', MAX_VIDEO_BATCH),
         errorCode: payload.errorCode == null ? null : String(payload.errorCode).slice(0, 80),
       });

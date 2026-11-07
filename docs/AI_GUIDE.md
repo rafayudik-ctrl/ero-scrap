@@ -12,7 +12,7 @@ Antes de alterar arquitetura, ler `README.md`, `docs/PROJECT_SPEC.md`, `docs/ARC
 
 1. A única palavra-chave vem de `config/search-keyword.txt`; não adicionar UI, tabela ou env override.
 2. Correspondência é `title OR any tag`, com normalização definida no domínio.
-3. Não consultar além das duas primeiras páginas New.
+3. Não consultar além das páginas New configuradas (padrão 4, máximo 6).
 4. Não persistir imagens, URLs de mídia, URLs assinadas ou links de download.
 5. Duração desconhecida deve ser rejeitada; nunca inferir duração por tamanho, título, tempo de transferência ou heurística.
 6. Não implementar download/cópia/transferência enquanto `COPY_AUTHORIZED` continuar `false` e antes da autorização pertinente.

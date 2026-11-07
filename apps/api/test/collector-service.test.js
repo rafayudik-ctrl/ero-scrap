@@ -68,7 +68,7 @@ test('collector service validates oversized and invalid payloads', async () => {
   }), /limit must be between/);
 });
 
-test('listing command rejects noncanonical URLs and page numbers outside New pages 1-2', async () => {
+test('listing command rejects noncanonical URLs and page numbers outside New pages 1-6', async () => {
   const db = new FakeD1();
   const base = {
     id: 'AbCd1234',
@@ -83,9 +83,15 @@ test('listing command rejects noncanonical URLs and page numbers outside New pag
   }), /canonical public Erome album URL/);
 
   await assert.rejects(executeCollectorCommand(db, 'posts.upsert', {
-    posts: [{ ...base, pageNumber: 3 }],
+    posts: [{ ...base, pageNumber: 7 }],
     now: '2026-11-01T00:00:00.000Z',
-  }), /pageNumber must be 1 or 2/);
+  }), /pageNumber must be between 1 and 6/);
+
+  // Page 4 (the new default depth) is accepted.
+  await executeCollectorCommand(db, 'posts.upsert', {
+    posts: [{ ...base, pageNumber: 4 }],
+    now: '2026-11-01T00:00:00.000Z',
+  });
 });
 
 test('inspection command rejects malformed media identifiers and invalid durations', async () => {

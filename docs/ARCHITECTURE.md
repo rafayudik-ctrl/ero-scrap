@@ -1,8 +1,8 @@
-# Arquitetura atual — Ero-Scrap 0.5.3
+# Arquitetura atual — Ero-Scrap 0.5.4
 
 ## Objetivo
 
-Monitorar somente as duas primeiras páginas de `New` do Erome a cada dez minutos, descobrir publicações, identificar vídeos individuais e aplicar uma única palavra-chave (título **ou** tag). Quando a cópia estiver explicitamente autorizada, o pipeline revalida cada vídeo, baixa apenas arquivos públicos permitidos com duração confirmada de até 600 segundos, gera uma miniatura WebP e transfere o arquivo ao MEGA. O catálogo privado mantém os metadados e aplica retenção por vídeo: sete dias sem clique ou 24 horas após o primeiro clique.
+Monitorar somente as primeiras páginas de `New` do Erome (4 por padrão, máx. 6) a cada 15 minutos, descobrir publicações, identificar vídeos individuais e aplicar uma única palavra-chave (título **ou** tag). Quando a cópia estiver explicitamente autorizada, o pipeline revalida cada vídeo, baixa apenas arquivos públicos permitidos com duração confirmada de até 600 segundos, gera uma miniatura WebP e transfere o arquivo ao MEGA. O catálogo privado mantém os metadados e aplica retenção por vídeo: sete dias sem clique ou 24 horas após o primeiro clique.
 
 ## Princípios de engenharia
 
@@ -24,7 +24,7 @@ Monitorar somente as duas primeiras páginas de `New` do Erome a cada dez minuto
 
 - Repositório privado guarda código e a palavra-chave.
 - Actions CI em runner `ubuntu-24.04` valida sintaxe, bundle Pages Functions e testes.
-- Actions automation usa runners `ubuntu-24.04` descartáveis: a cada dez minutos executa a varredura e, se a trava estiver liberada, processa no máximo um vídeo por execução.
+- Actions automation usa runners `ubuntu-24.04` descartáveis: a cada 15 minutos executa a varredura e, se a trava estiver liberada, processa no máximo um vídeo por execução.
 - Quando a trava está fechada, o mesmo workflow consulta D1 para saber se há exclusões vencidas e só instala/autentica o MEGAcmd quando há trabalho de retenção. Não há cron ou runner separado para limpeza.
 - Actions D1 migrations aplica migrations remotas sob demanda.
 
@@ -53,7 +53,7 @@ Bucket privado `ero-scrap-thumbnails`, usado somente para WebP pequenas. A API e
 
 O runner executa em Ubuntu efêmero e possui:
 
-- `ScanService`: lê a palavra-chave, consulta somente New 1/2, inspeciona posts que ainda aparecem nessas páginas e persiste metadados;
+- `ScanService`: lê a palavra-chave, consulta somente as páginas New configuradas (1–6), inspeciona posts que ainda aparecem nessas páginas e persiste metadados;
 - `EromeMediaProcessingService`: com a trava aberta, reclama um job, relê a página pública do álbum, revalida título/tag, ID do vídeo e duração, baixa em stream, confirma duração real com FFprobe, gera WebP e envia ao MEGA;
 - `RetentionService`: reclama jobs vencidos, exclui arquivo MEGA, remove thumbnail R2 e conclui D1;
 - `MaintenanceService`: poda metadados/histórico antigos em lotes limitados.
@@ -62,8 +62,8 @@ O pipeline processa no máximo um vídeo por execução agendada. O arquivo temp
 
 ### Adaptador Erome — `packages/source-erome`
 
-- URLs fixas de New page 1/2; não aceita outras páginas.
-- Inspeciona somente posts que aparecem nessas duas páginas.
+- URLs fixas de New (páginas 1–6, configuráveis); não aceita outras páginas.
+- Inspeciona somente posts que aparecem nas páginas consultadas.
 - Um post pode ter vários vídeos e imagens. Imagens não são enfileiradas.
 - `mediaUrl` é transitória; a API sanitiza e não persiste URLs de mídia em D1. O runner reabre o álbum antes da transferência para obter a URL pública atual.
 - Hosts precisam pertencer a `erome.com`/subdomínios HTTPS e extensões suportadas. Redirecionamentos, hosts externos, autenticação e 401/403 são recusados; 429 é reagendado sem tentar contornar o limite.
@@ -87,7 +87,7 @@ MEGAcmd oficial é executado com `spawn`, `shell: false`, argumentos separados, 
 ### Descoberta
 
 ```text
-GitHub Actions (cada 20 min)
+GitHub Actions (cada 15 min)
   -> ler config/search-keyword.txt
   -> GET New page 1 e page 2 (sem página 3+)
   -> upsert dos posts
@@ -124,7 +124,7 @@ Browser autenticado
   -> expires_at = first_clicked_at + 24 h
   -> 303 para o link MEGA
 
-GitHub Actions (mesmo job de 20 min; também no modo full)
+GitHub Actions (mesmo job de 15 min; também no modo full)
   -> consultar D1 se há exclusões vencidas
   -> se houver, autenticar MEGA e reclamar exclusões com lease
   -> apagar arquivo exato no MEGA
@@ -134,7 +134,7 @@ GitHub Actions (mesmo job de 20 min; também no modo full)
 
 ## Limites operacionais
 
-- 2 páginas New por varredura, no máximo 80 cards por página e 160 inspeções de posts por ciclo.
+- 4 páginas New por varredura (configurável, 1–6), no máximo 80 cards por página e 160 inspeções de posts por ciclo.
 - Intervalo mínimo de 1,5 s entre requisições públicas e timeout/limite de tamanho HTML.
 - GitHub schedule é best-effort; cron configurado não é SLA de tempo real.
 - Um vídeo por execução de processamento; concorrência controlada por workflow group e lease D1.

@@ -1,4 +1,5 @@
 import { APP_CONFIG } from '../../config/src/app.js';
+import { isValidListingPage, MIN_LISTING_PAGES, MAX_LISTING_PAGES } from '../../config/src/scan-pages.js';
 import { normalizeAlbumUrl } from './normalizers.js';
 
 const BASE_URL = 'https://www.erome.com';
@@ -128,12 +129,12 @@ export class EromeClient {
   }
 
   async fetchNewPage(pageNumber) {
-    if (pageNumber !== 1 && pageNumber !== 2) {
-      throw new RangeError('Only the first two New pages may be fetched.');
+    if (!isValidListingPage(pageNumber)) {
+      throw new RangeError(`Only New pages ${MIN_LISTING_PAGES}-${MAX_LISTING_PAGES} may be fetched.`);
     }
 
     const url = new URL('/explore/new', BASE_URL);
-    if (pageNumber === 2) url.searchParams.set('page', '2');
+    if (pageNumber > 1) url.searchParams.set('page', String(pageNumber));
     return this.#fetchHtml(url);
   }
 

@@ -16,7 +16,7 @@ A exclusão de arquivos já armazenados continua permitida mesmo com a trava fec
 
 ## Coleta e mídia
 
-- Somente a aba pública `New`, páginas 1 e 2, e posts nelas listados.
+- Somente a aba pública `New`, primeiras páginas (padrão 1–4, máximo 6), e posts nelas listados.
 - O downloader só aceita URLs HTTPS com host dentro de `erome.com` e extensão de vídeo permitida.
 - Redirecionamentos não são seguidos.
 - HTTP 401/403 é falha definitiva; 429 aguarda nova tentativa posterior.
