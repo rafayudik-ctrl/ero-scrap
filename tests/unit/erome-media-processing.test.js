@@ -166,3 +166,21 @@ test('runBatch limits, budget and consecutive-failure stop', async () => {
     await assert.rejects(make(true).runBatch({ maxVideos: 0 }), RangeError);
   });
 });
+
+test('a removed Erome post (HTTP 404/410) is a permanent failure, not a retry', async () => {
+  const src = await import('node:fs').then((fs) => fs.readFileSync(new URL('../../apps/runner/src/services/erome-media-processing-service.js', import.meta.url), 'utf8'));
+  assert.match(src, /'source_post_gone'/u);
+  const client = await import('node:fs').then((fs) => fs.readFileSync(new URL('../../packages/source-erome/src/client.js', import.meta.url), 'utf8'));
+  assert.match(client, /status === 404 \|\| response\.status === 410/u);
+});
+
+test('source errors carry the HTTP status for 4xx and 5xx responses', async () => {
+  const { EromeClient } = await import('../../packages/source-erome/src/index.js');
+  for (const status of [404, 410, 500, 503, 429, 403]) {
+    const client = new EromeClient({ fetchImpl: async () => new Response('x', { status }), minimumDelayMs: 0 });
+    await assert.rejects(client.fetchAlbum('https://www.erome.com/a/AbCd1234'), (error) => {
+      assert.equal(error.status, status);
+      return true;
+    });
+  }
+});

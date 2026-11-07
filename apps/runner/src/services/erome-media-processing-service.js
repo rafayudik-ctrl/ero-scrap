@@ -11,7 +11,7 @@ const PERMANENT_ERROR_CODES = new Set([
   'media_extension_unsupported', 'media_content_type_rejected', 'media_size_rejected',
   'media_length_invalid', 'media_metadata_incomplete', 'media_duration_mismatch',
   'media_duration_unknown', 'media_too_long', 'source_video_missing',
-  'keyword_no_longer_matches', 'media_lease_stale', 'media_registration_rejected',
+  'keyword_no_longer_matches', 'source_post_gone', 'media_lease_stale', 'media_registration_rejected',
 ]);
 
 function safeErrorCode(error) {
@@ -221,6 +221,8 @@ export class EromeMediaProcessingService {
         this.#logger.error?.('[ero-scrap] Erome media processing failed', {
           assetId: job.assetId,
           errorCode,
+          // HTTP status of the Erome page or media server, when the failure came from one (404, 429, 503...).
+          ...(Number.isInteger(error?.status) ? { httpStatus: error.status } : {}),
           // Which MEGAcmd step failed (name and exit code only, never its output).
           ...(typeof error?.command === 'string' ? { megaCommand: error.command, exitCode: error.exitCode ?? null } : {}),
           attempt: job.attempts,

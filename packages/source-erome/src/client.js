@@ -10,6 +10,7 @@ export class EromeSourceError extends Error {
     this.name = 'EromeSourceError';
     this.code = code;
     this.retryAfterMs = options.retryAfterMs ?? null;
+    this.status = options.status ?? null; // HTTP status when the failure came from a response
   }
 }
 
@@ -97,16 +98,20 @@ export class EromeClient {
     if (response.status === 429) {
       throw new EromeSourceError('rate_limited', 'Erome returned HTTP 429; the scan was stopped.', {
         retryAfterMs: parseRetryAfter(response.headers.get('retry-after')),
+        status: 429,
       });
     }
     if (response.status >= 300 && response.status < 400) {
-      throw new EromeSourceError('redirect_rejected', 'Unexpected redirects are not followed by the collector.');
+      throw new EromeSourceError('redirect_rejected', 'Unexpected redirects are not followed by the collector.', { status: response.status });
     }
     if (response.status === 403 || response.status === 401) {
-      throw new EromeSourceError('access_denied', `Erome returned HTTP ${response.status}; no access restriction will be bypassed.`);
+      throw new EromeSourceError('access_denied', `Erome returned HTTP ${response.status}; no access restriction will be bypassed.`, { status: response.status });
+    }
+    if (response.status === 404 || response.status === 410) {
+      throw new EromeSourceError('source_post_gone', `Erome returned HTTP ${response.status}: the post was removed.`, { status: response.status });
     }
     if (!response.ok) {
-      throw new EromeSourceError('http_error', `Erome returned HTTP ${response.status}.`);
+      throw new EromeSourceError('http_error', `Erome returned HTTP ${response.status}.`, { status: response.status });
     }
 
     const contentType = response.headers.get('content-type') ?? '';

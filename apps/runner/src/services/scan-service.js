@@ -19,7 +19,7 @@ function mergeListingPosts(pages) {
 function getErrorCode(error) {
   const allowed = new Set([
     'rate_limited', 'access_denied', 'redirect_rejected', 'request_timeout',
-    'network_error', 'http_error', 'unexpected_content_type', 'response_too_large',
+    'network_error', 'http_error', 'source_post_gone', 'unexpected_content_type', 'response_too_large',
     'empty_response', 'parser_no_posts', 'parser_post_limit_exceeded', 'parser_listing_container_missing',
     'collector_timeout', 'collector_network_error', 'collector_invalid_response',
     'collector_request_failed', 'invalid_payload', 'collector_operation_failed',
@@ -118,6 +118,7 @@ export class ScanService {
           pagesScanned += 1;
         } catch (error) {
           errorCode = getErrorCode(error);
+          this.#logger.warn?.('[ero-scrap] listing page failed', { page: pageNumber, errorCode, ...(Number.isInteger(error?.status) ? { httpStatus: error.status } : {}) });
           if (pagesScanned === 0) throw error;
           break;
         }
@@ -153,6 +154,7 @@ export class ScanService {
           checked.add(candidate.id);
         } catch (error) {
           inspectionFailures += 1;
+          this.#logger.warn?.('[ero-scrap] album inspection failed', { postId: candidate.id, errorCode: getErrorCode(error), ...(Number.isInteger(error?.status) ? { httpStatus: error.status } : {}) });
           errorCode ??= getErrorCode(error);
           if (error?.code === 'rate_limited' || error?.code === 'access_denied') break;
         }
