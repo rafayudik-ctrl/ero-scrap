@@ -107,6 +107,8 @@ test('MEGA upload compensates an object when export verification fails after upl
       ['ls', '--show-handles'],
       ['export', '-d'],
       ['rm', '-f'],
+      // Folder listed, saw (fake) content, so it is left alone.
+      ['ls', `/Ero-Scrap/${ASSET_ID}`],
     ]);
   });
 });
@@ -153,6 +155,7 @@ test('MEGA deletion treats a confirmed absent file as already deleted', async ()
   }), {
     deleted: true,
     alreadyAbsent: true,
+    folderRemoved: false,
     objectId: `/Ero-Scrap/${ASSET_ID}/authorized-sample.mp4`,
   });
 });
@@ -172,8 +175,88 @@ test('MEGA deletion revokes sharing best-effort and removes only the exact file'
   });
   assert.equal(result.deleted, true);
   assert.equal(result.alreadyAbsent, false);
-  assert.deepEqual(commands.map(({ command }) => command), ['ls', 'export', 'rm']);
+  assert.equal(result.folderRemoved, true);
+  assert.deepEqual(commands.map(({ command }) => command), ['ls', 'export', 'rm', 'ls', 'rm']);
   assert.deepEqual(commands[2].args, ['-f', `/Ero-Scrap/${ASSET_ID}/authorized-sample.mp4`]);
+  // Then the now-empty per-asset folder (exact validated path) is removed.
+  assert.deepEqual(commands[3].args, [`/Ero-Scrap/${ASSET_ID}`]);
+  assert.deepEqual(commands[4].args, ['-r', '-f', `/Ero-Scrap/${ASSET_ID}`]);
+});
+
+test('MEGA deletion keeps the asset folder when it still holds something', async () => {
+  const commands = [];
+  const provider = new MegaCmdStorageProvider({
+    runCommand: async (command, args) => {
+      commands.push({ command, args });
+      if (command === 'ls' && args[0] === `/Ero-Scrap/${ASSET_ID}`) return { stdout: 'other.mp4\n', stderr: '', exitCode: 0 };
+      return { stdout: '', stderr: '', exitCode: 0 };
+    },
+  });
+  const result = await provider.deleteObject({ assetId: ASSET_ID, objectId: `/Ero-Scrap/${ASSET_ID}/authorized-sample.mp4` });
+  assert.equal(result.deleted, true);
+  assert.equal(result.folderRemoved, false);
+  assert.equal(commands.filter(({ command }) => command === 'rm').length, 1);
+});
+
+test('MEGA deletion still succeeds when the empty folder cannot be removed', async () => {
+  const provider = new MegaCmdStorageProvider({
+    runCommand: async (command, args) => {
+      if (command === 'rm' && args[0] === '-r') throw new Error('boom');
+      return { stdout: '', stderr: '', exitCode: 0 };
+    },
+  });
+  const result = await provider.deleteObject({ assetId: ASSET_ID, objectId: `/Ero-Scrap/${ASSET_ID}/authorized-sample.mp4` });
+  assert.deepEqual([result.deleted, result.folderRemoved], [true, false]);
+});
+
+test('MEGA deletion of an already absent file still tidies a leftover empty folder', async () => {
+  const commands = [];
+  const provider = new MegaCmdStorageProvider({
+    runCommand: async (command, args) => {
+      commands.push({ command, args });
+      if (command === 'ls' && args[0] === '--show-handles') throw missingFileError();
+      return { stdout: '', stderr: '', exitCode: 0 };
+    },
+  });
+  const result = await provider.deleteObject({ assetId: ASSET_ID, objectId: `/Ero-Scrap/${ASSET_ID}/authorized-sample.mp4` });
+  assert.deepEqual([result.alreadyAbsent, result.folderRemoved], [true, true]);
+  assert.deepEqual(commands.at(-1).args, ['-r', '-f', `/Ero-Scrap/${ASSET_ID}`]);
+});
+
+test('empty-folder sweep inspects a bounded random sample and only touches asset-ID-shaped names', async () => {
+  const ids = Array.from({ length: 30 }, (_, index) => index.toString(16).padStart(32, '0'));
+  const commands = [];
+  const provider = new MegaCmdStorageProvider({
+    runCommand: async (command, args) => {
+      commands.push({ command, args });
+      if (command === 'ls' && args[0] === '/Ero-Scrap') {
+        return { stdout: `${ids.join('\n')}\nnot-an-asset\n../escape\n`, stderr: '', exitCode: 0 };
+      }
+      // Odd folders still hold a file; even ones are empty.
+      if (command === 'ls') return { stdout: Number.parseInt(args[0].slice(-2), 16) % 2 ? 'x.mp4\n' : '', stderr: '', exitCode: 0 };
+      return { stdout: '', stderr: '', exitCode: 0 };
+    },
+  });
+  const result = await provider.pruneEmptyFolders({ maxChecks: 8, random: () => 0 });
+  assert.equal(result.listed, 30);
+  assert.equal(result.checked, 8);
+  assert.ok(result.removed > 0 && result.removed <= 8);
+  const removals = commands.filter(({ command }) => command === 'rm');
+  assert.equal(removals.length, result.removed);
+  for (const { args } of removals) {
+    assert.equal(args[0], '-r');
+    assert.match(args[2], /^\/Ero-Scrap\/[a-f0-9]{32}$/u);
+  }
+  // 1 root listing + 8 folder listings + removals; never more than the budget.
+  assert.equal(commands.filter(({ command }) => command === 'ls').length, 9);
+});
+
+test('empty-folder sweep with maxChecks 0 runs no command and rejects bad budgets', async () => {
+  let count = 0;
+  const provider = new MegaCmdStorageProvider({ runCommand: async () => { count += 1; return { stdout: '' }; } });
+  assert.deepEqual(await provider.pruneEmptyFolders({ maxChecks: 0 }), { listed: 0, checked: 0, removed: 0 });
+  assert.equal(count, 0);
+  await assert.rejects(provider.pruneEmptyFolders({ maxChecks: 501 }), RangeError);
 });
 
 test('MEGAcmd wording "Couldn\'t find" counts as a missing file, so the first upload proceeds', async () => {

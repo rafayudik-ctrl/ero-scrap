@@ -66,6 +66,8 @@ export class MegaCmdStorageProvider {
       // Only the transfer may take long. Every other step is a quick metadata call;
       // a hung one must fail in a minute instead of holding the whole job.
       commandTimeoutsMs: { put: timeoutMs, ls: 60_000, mkdir: 60_000, export: 60_000, rm: 60_000, whoami: 60_000 },
+      // The root listing used by the empty-folder sweep is ~33 bytes per folder.
+      maxOutputBytes: 1024 * 1024,
     });
     this.#remoteRoot = normalizeRemoteRoot(remoteRoot);
     this.#authorizeCopy = authorizeCopy;
@@ -75,6 +77,54 @@ export class MegaCmdStorageProvider {
   async checkConnection() {
     await this.#run('whoami', []);
     return { connected: true };
+  }
+
+  /**
+   * Remove the per-asset folder only when it is confirmed empty. Best effort:
+   * a folder that cannot be inspected or removed is simply left for the next
+   * pass, and this never fails the caller. The path is always
+   * `${remoteRoot}/${assetId}` with a validated 32-hex asset ID, and the folder
+   * is only removed after a listing proved it holds nothing.
+   */
+  async #removeFolderIfEmpty(assetId) {
+    const folder = `${this.#remoteRoot}/${assetId}`;
+    try {
+      const listing = await this.#run('ls', [folder]);
+      if (String(listing?.stdout ?? '').trim() !== '') return false;
+      await this.#run('rm', ['-r', '-f', folder]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Bounded sweep for empty per-asset folders left by earlier versions. One
+   * listing of the root, then at most `maxChecks` randomly chosen folders are
+   * inspected, so cost per run is constant no matter how many folders exist.
+   * Only names that look exactly like an asset ID are ever touched.
+   */
+  async pruneEmptyFolders({ maxChecks = 10, random = Math.random } = {}) {
+    if (!Number.isInteger(maxChecks) || maxChecks < 0 || maxChecks > 500) {
+      throw new RangeError('maxChecks must be an integer between 0 and 500.');
+    }
+    if (maxChecks === 0) return { listed: 0, checked: 0, removed: 0 };
+
+    const listing = await this.#run('ls', [this.#remoteRoot]);
+    const names = String(listing?.stdout ?? '')
+      .split(/\r?\n/u)
+      .map((line) => line.trim().replace(/\/$/u, ''))
+      .filter((name) => ASSET_ID_PATTERN.test(name));
+
+    const checks = Math.min(maxChecks, names.length);
+    let removed = 0;
+    for (let index = 0; index < checks; index += 1) {
+      // Partial Fisher-Yates: uniform sample without building a second array.
+      const pick = index + Math.floor(random() * (names.length - index));
+      [names[index], names[pick]] = [names[pick], names[index]];
+      if (await this.#removeFolderIfEmpty(names[index])) removed += 1;
+    }
+    return { listed: names.length, checked: checks, removed };
   }
 
   async uploadLocalFile({ assetId, localPath }) {
@@ -140,11 +190,13 @@ export class MegaCmdStorageProvider {
       // Probe the exact destination and compensate only when it is confirmed
       // present. Authentication/network failures are never mistaken for absence.
       let confirmedPresent = false;
+      let probeConclusive = true;
       try {
         await this.#run('ls', ['--show-handles', remoteObjectId]);
         confirmedPresent = true;
       } catch (probeError) {
         if (!isMissingRemoteObject(probeError)) {
+          probeConclusive = false;
           Object.defineProperty(error, 'cleanupError', { value: probeError, enumerable: false });
         }
       }
@@ -157,6 +209,10 @@ export class MegaCmdStorageProvider {
           Object.defineProperty(error, 'cleanupError', { value: cleanupError, enumerable: false });
         }
       }
+      // A failed attempt must not leave an empty folder behind (a no-op when
+      // the file is still there). Skipped when MEGA was unreachable, so an
+      // outage does not add another slow, doomed command.
+      if (probeConclusive) await this.#removeFolderIfEmpty(assetId);
       throw error;
     }
 
@@ -187,7 +243,11 @@ export class MegaCmdStorageProvider {
     try {
       await this.#run('ls', ['--show-handles', objectId]);
     } catch (error) {
-      if (isMissingRemoteObject(error)) return { deleted: true, alreadyAbsent: true, objectId };
+      if (isMissingRemoteObject(error)) {
+        // File already gone: still tidy a folder left behind by older versions.
+        const folderRemoved = await this.#removeFolderIfEmpty(assetId);
+        return { deleted: true, alreadyAbsent: true, folderRemoved, objectId };
+      }
       throw error;
     }
 
@@ -205,10 +265,14 @@ export class MegaCmdStorageProvider {
       try {
         await this.#run('ls', ['--show-handles', objectId]);
       } catch (probeError) {
-        if (isMissingRemoteObject(probeError)) return { deleted: true, alreadyAbsent: true, objectId };
+        if (isMissingRemoteObject(probeError)) {
+          const folderRemoved = await this.#removeFolderIfEmpty(assetId);
+          return { deleted: true, alreadyAbsent: true, folderRemoved, objectId };
+        }
       }
       throw error;
     }
-    return { deleted: true, alreadyAbsent: false, objectId };
+    const folderRemoved = await this.#removeFolderIfEmpty(assetId);
+    return { deleted: true, alreadyAbsent: false, folderRemoved, objectId };
   }
 }

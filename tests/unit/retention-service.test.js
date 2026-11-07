@@ -146,3 +146,41 @@ test('retention due-check delegates to the private repository with the current t
   assert.equal(await service.hasDue(), true);
   assert.deepEqual(received, { now: NOW });
 });
+
+test('retention sweeps empty MEGA folders only after deleting something, and never fails the pass', async () => {
+  const sweeps = [];
+  const build = (jobs, provider) => new RetentionService({
+    repository: {
+      async claimDueDeletionJobs() { return jobs; },
+      async completeDeletion() {},
+      async failDeletion() { throw new Error('must not fail'); },
+    },
+    storageProviders: { mega: { async deleteObject() { return { deleted: true }; }, ...provider } },
+    now: () => new Date(NOW),
+    folderSweepChecks: 7,
+    logger: { info() {}, error() {}, warn() {} },
+  });
+
+  const withJob = await build([makeJob()], {
+    async pruneEmptyFolders(params) { sweeps.push(params); return { listed: 3, checked: 3, removed: 1 }; },
+  }).runOnce();
+  assert.deepEqual(sweeps, [{ maxChecks: 7 }]);
+  assert.deepEqual(withJob.folderSweep, { listed: 3, checked: 3, removed: 1 });
+
+  // Nothing deleted: no sweep.
+  await build([], { async pruneEmptyFolders(params) { sweeps.push(params); } }).runOnce();
+  assert.equal(sweeps.length, 1);
+
+  // A failing sweep is swallowed.
+  const failed = await build([makeJob()], {
+    async pruneEmptyFolders() { throw Object.assign(new Error('x'), { code: 'mega_timeout' }); },
+  }).runOnce();
+  assert.equal(failed.deleted, 1);
+  assert.equal(failed.folderSweep, null);
+});
+
+test('retention rejects an invalid folder sweep budget', () => {
+  assert.throws(() => new RetentionService({
+    repository: { async claimDueDeletionJobs() { return []; } }, storageProviders: {}, folderSweepChecks: 501,
+  }), RangeError);
+});

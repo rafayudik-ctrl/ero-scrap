@@ -12,8 +12,9 @@ export class RetentionService {
   #now;
   #limit;
   #maxBatches;
+  #folderSweepChecks;
 
-  constructor({ repository, storageProviders, logger = console, now = () => new Date(), limit = 10, maxBatches = 1 }) {
+  constructor({ repository, storageProviders, logger = console, now = () => new Date(), limit = 10, maxBatches = 1, folderSweepChecks = 0 }) {
     if (!repository || typeof repository.claimDueDeletionJobs !== 'function') {
       throw new TypeError('A retention repository is required.');
     }
@@ -30,6 +31,10 @@ export class RetentionService {
     }
     this.#limit = limit;
     this.#maxBatches = maxBatches;
+    if (!Number.isInteger(folderSweepChecks) || folderSweepChecks < 0 || folderSweepChecks > 500) {
+      throw new RangeError('Retention folderSweepChecks must be between 0 and 500.');
+    }
+    this.#folderSweepChecks = folderSweepChecks;
   }
 
   async hasDue() {
@@ -50,8 +55,25 @@ export class RetentionService {
       await this.#processJobs(jobs, results);
       if (jobs.length < this.#limit) break;
     }
+    // Empty-folder sweep: only after something was deleted (that is when empty
+    // folders can appear), bounded to a few checks, never fails the pass.
+    if (results.deleted > 0 && this.#folderSweepChecks > 0) {
+      results.folderSweep = await this.#sweepEmptyFolders();
+    }
     this.#logger.info?.('[ero-scrap] retention pass completed', results);
     return results;
+  }
+
+  async #sweepEmptyFolders() {
+    const provider = this.#storageProviders.mega;
+    if (typeof provider?.pruneEmptyFolders !== 'function') return null;
+    try {
+      return await provider.pruneEmptyFolders({ maxChecks: this.#folderSweepChecks });
+    } catch (error) {
+      const errorCode = SAFE_ERROR_CODE.test(error?.code ?? '') ? error.code : 'folder_sweep_failed';
+      this.#logger.warn?.('[ero-scrap] empty folder sweep failed', { errorCode });
+      return null;
+    }
   }
 
   async #processJobs(jobs, results) {

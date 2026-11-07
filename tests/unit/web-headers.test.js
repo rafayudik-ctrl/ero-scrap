@@ -30,3 +30,14 @@ test('no URL matches two Cache-Control rules (Pages merges matching rules)', () 
   assert.ok(!withCache.some((rule) => rule.path === '/*'), 'global rule must not carry Cache-Control');
   assert.equal(header(rules.find((rule) => rule.path === '/assets/*'), 'Cache-Control').includes('no-cache'), false);
 });
+
+test('the site ships an SVG favicon and marks opened cards with a gold style', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const html = await readFile(new URL('../../apps/web/public/index.html', import.meta.url), 'utf8');
+  const js = await readFile(new URL('../../apps/web/public/assets/js/app.js', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../../apps/web/public/assets/css/app.css', import.meta.url), 'utf8');
+  assert.match(html, /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml">/u);
+  assert.match(await readFile(new URL('../../apps/web/public/favicon.svg', import.meta.url), 'utf8'), /^<svg /u);
+  assert.match(js, /status === 'clicked'\) article\.classList\.add\('is-opened'\)/u);
+  assert.match(css, /\.video-card\.is-opened \{ border-color: var\(--gold\)/u);
+});

@@ -101,6 +101,9 @@ h1, h2, h3, p { margin-top: 0; }
 .notice-status { padding: 5px 8px; border-radius: 6px; color: var(--warning); background: var(--warning-soft); font-size: 10px; font-weight: 650; white-space: nowrap; }
 .catalog-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
 .video-card { overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-soft); }
+/* Opened videos (24 h expiry countdown running): gold border, no extra requests or layout shift. */
+.video-card.is-opened { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold), 0 8px 28px var(--gold-soft); }
+.video-card.is-opened .video-expiry { color: var(--warning); font-weight: 600; }
 .video-thumbnail { position: relative; min-height: 150px; aspect-ratio: 16 / 9; display: grid; place-items: center; overflow: hidden; padding: 12px; color: var(--text-tertiary); background: linear-gradient(135deg, var(--surface-subtle), var(--surface-raised)); font-size: 11px; }
 .video-thumbnail img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 /* Vertical videos: a taller box so the whole frame shows instead of a thin strip. */

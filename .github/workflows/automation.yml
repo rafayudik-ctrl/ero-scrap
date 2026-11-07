@@ -39,6 +39,8 @@ env:
   SEARCH_KEYWORD: ${{ secrets.SEARCH_KEYWORD }}
   # Days an unopened video stays stored (1-7). Empty = the default in packages/config/src/app.js (4).
   UNOPENED_RETENTION_DAYS: ${{ vars.UNOPENED_RETENTION_DAYS }}
+  # Existing MEGA folders inspected per retention pass to remove empty leftovers (default 10, 0 = off, max 200).
+  MEGA_EMPTY_FOLDER_SWEEP_CHECKS: ${{ vars.MEGA_EMPTY_FOLDER_SWEEP_CHECKS }}
 
 jobs:
   scan:

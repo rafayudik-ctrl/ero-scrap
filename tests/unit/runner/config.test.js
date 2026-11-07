@@ -52,3 +52,14 @@ test('MEGA check configuration is independent from Cloudflare API credentials', 
   assert.equal(config.ffprobeBinary, 'ffprobe');
   assert.equal(loadMegaConfig({ FFPROBE_BINARY: 'ffprobe-custom' }).ffprobeBinary, 'ffprobe-custom');
 });
+
+test('folder sweep budget defaults to 10, accepts 0 to disable and caps at 200', async () => {
+  const { resolveFolderSweepChecks } = await import('../../../apps/runner/src/config/env.js');
+  assert.equal(resolveFolderSweepChecks(undefined), 10);
+  assert.equal(resolveFolderSweepChecks(''), 10);
+  assert.equal(resolveFolderSweepChecks('abc'), 10);
+  assert.equal(resolveFolderSweepChecks('0'), 0);
+  assert.equal(resolveFolderSweepChecks('50'), 50);
+  assert.equal(resolveFolderSweepChecks('999'), 200);
+  assert.equal(loadRunnerConfig(validEnv).folderSweepChecks, 10);
+});

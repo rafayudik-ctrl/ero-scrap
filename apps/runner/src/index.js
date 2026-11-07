@@ -48,6 +48,7 @@ export function createRunner({ env = process.env, fetchImpl = globalThis.fetch, 
     logger,
     limit: config.retentionBatchSize,
     maxBatches: config.retentionMaxBatches,
+    folderSweepChecks: config.folderSweepChecks,
   });
   const maintenanceService = new MaintenanceService({ repository, logger, unopenedDays: config.unopenedRetentionDays });
   const mediaProcessingService = new EromeMediaProcessingService({

@@ -83,6 +83,8 @@ function createVideoCard(item) {
   const article = document.createElement('article');
   article.className = 'video-card';
   article.dataset.id = item.id;
+  // Already opened: the 24 h expiry countdown has started (gold border, CSS only).
+  if (item.status === 'clicked') article.classList.add('is-opened');
 
   const thumbnail = document.createElement('div');
   thumbnail.className = 'video-thumbnail';
@@ -134,6 +136,8 @@ function createVideoCard(item) {
   openForm.action = getOpenActionUrl(item.id);
   openForm.target = '_blank';
   openForm.rel = 'noopener';
+  // The server starts the 24 h countdown on this POST; reflect it without a reload.
+  openForm.addEventListener('submit', () => article.classList.add('is-opened'));
 
   const openButton = document.createElement('button');
   openButton.type = 'submit';

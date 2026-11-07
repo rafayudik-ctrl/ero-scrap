@@ -438,3 +438,13 @@ Uso esperado: cerca de 7 escritas por scan (cerca de 500 por dia, sem contar os 
 2. Nome `UNOPENED_RETENTION_DAYS`, valor um número de 1 a 7 (por exemplo `7`).
 
 Vale para os vídeos novos. Se você **diminuir** o valor, os vídeos já guardados e ainda não abertos também são encurtados na faxina diária (uma vez por dia, perto das 00:00 no Brasil). Aumentar não estende os que já existem. Depois do primeiro clique continuam valendo 24 horas, qualquer que seja o valor. Para voltar ao padrão, apague a variável.
+
+## 20. Borda dourada, pastas vazias no MEGA e ícone
+
+**Borda dourada:** vídeos que você já abriu (a contagem de 24 horas para expirar começou) ganham borda dourada e a data de expiração em destaque. É só CSS: nenhuma requisição ou cálculo a mais. Ao clicar em **Abrir no MEGA** o cartão fica dourado na hora, sem recarregar.
+
+**Pastas vazias no MEGA:** cada vídeo fica numa pasta própria. Agora, depois de apagar o arquivo, a pasta dele também é removida, mas só depois de listar a pasta e confirmar que está vazia (caminho exato `/Ero-Scrap/<id de 32 caracteres>`). Isso cobre também upload que falhou e arquivo que já tinha sumido. Se a remoção falhar, nada quebra: a pasta fica para a próxima faxina.
+
+Para as pastas vazias que já existem, cada execução que apagou algo inspeciona uma **amostra aleatória** de pastas (padrão 10) e remove as vazias. O custo por execução é fixo (1 listagem + até 10 consultas), por maior que seja o número de pastas. Para limpar um acúmulo grande mais rápido, crie a variável de repositório `MEGA_EMPTY_FOLDER_SWEEP_CHECKS` (por exemplo `100`, máximo 200) e volte para `10` ou apague a variável depois; `0` desliga. O log mostra `folderSweep: { listed, checked, removed }`.
+
+**Ícone:** `favicon.svg` (disco azul com play e um arco dourado de "tempo", como a contagem de 24 horas). O mesmo desenho aparece no cabeçalho do site e acompanha o tema claro/escuro.

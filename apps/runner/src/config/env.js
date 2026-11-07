@@ -35,6 +35,16 @@ function normalizeCollectorEndpoint(value, appEnv) {
 }
 
 
+/**
+ * How many existing MEGA folders one retention pass may inspect for emptiness
+ * (legacy leftovers). Empty/invalid = 10; 0 disables the sweep; max 200.
+ */
+export function resolveFolderSweepChecks(value, fallback = 10) {
+  const text = String(value ?? '').trim();
+  if (!/^\d{1,3}$/u.test(text)) return fallback;
+  return Math.min(200, Number(text));
+}
+
 export function loadMegaConfig(env = process.env) {
   const remoteRoot = String(env.MEGA_REMOTE_ROOT ?? '/Ero-Scrap').trim();
   const timeoutValue = Number(env.MEGA_COMMAND_TIMEOUT_MS ?? 120_000);
@@ -85,6 +95,7 @@ export function loadRunnerConfig(env = process.env) {
     retentionBatchSize: APP_CONFIG.retention.batchSize,
     retentionMaxBatches: APP_CONFIG.retention.maxBatchesPerSweep,
     unopenedRetentionDays: resolveUnopenedDays(env.UNOPENED_RETENTION_DAYS),
+    folderSweepChecks: resolveFolderSweepChecks(env.MEGA_EMPTY_FOLDER_SWEEP_CHECKS),
     maintenanceIntervalMs: APP_CONFIG.maintenance.intervalHours * 60 * 60_000,
     ...loadMegaConfig(env),
   });
