@@ -175,3 +175,16 @@ test('retention due check is a narrow read-only operation', async () => {
     '2026-11-01T12:00:00.000Z',
   ]);
 });
+
+test('scan.finish accepts up to 6 pages scanned and rejects more', async () => {
+  const { createSqliteD1 } = await import('../../../tests/helpers/sqlite-d1.js');
+  const db = createSqliteD1();
+  const { scanId } = await executeCollectorCommand(db, 'scan.create', { startedAt: '2026-11-07T00:00:00.000Z' });
+  const finish = (pagesScanned) => executeCollectorCommand(db, 'scan.finish', {
+    id: scanId, finishedAt: '2026-11-07T00:01:00.000Z', status: 'succeeded',
+    pagesScanned, postsSeen: 320, matchingPosts: 0, videoCandidates: 0,
+  });
+  await finish(4);
+  await finish(6);
+  await assert.rejects(finish(7), /pagesScanned/);
+});

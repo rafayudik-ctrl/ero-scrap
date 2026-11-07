@@ -172,7 +172,7 @@ export async function executeCollectorCommand(db, operation, rawPayload, { thumb
       await repository.finishScanRun(payload.id, {
         finishedAt: requireIsoDate(payload.finishedAt, 'finishedAt'),
         status: payload.status,
-        pagesScanned: requireNonNegativeInteger(payload.pagesScanned, 'pagesScanned', 2),
+        pagesScanned: requireNonNegativeInteger(payload.pagesScanned, 'pagesScanned', MAX_LISTING_PAGES),
         postsSeen: requireNonNegativeInteger(payload.postsSeen, 'postsSeen', MAX_LISTED_POSTS),
         matchingPosts: requireNonNegativeInteger(payload.matchingPosts, 'matchingPosts', MAX_LISTED_POSTS),
         videoCandidates: requireNonNegativeInteger(payload.videoCandidates, 'videoCandidates', MAX_VIDEO_BATCH),

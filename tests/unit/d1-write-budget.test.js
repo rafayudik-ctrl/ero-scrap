@@ -65,3 +65,13 @@ test('housekeeping runs at most once per UTC day, but its own batches continue',
   const nextDay = await repository.pruneStale({ now: '2026-11-07T03:03:00.000Z', batchSize: 2 });
   assert.equal(nextDay.videos, 1);
 });
+
+test('migration 0010 lets scan_runs record up to 6 pages and keeps recent rows', async () => {
+  const db = createSqliteD1();
+  const insert = (id, pages) => db.sqlite.prepare(
+    "INSERT INTO scan_runs (id, started_at, status, pages_scanned, created_at) VALUES (?, ?, 'succeeded', ?, ?)",
+  ).run(id, `2026-11-0${(pages % 9) + 1}T00:00:00Z`, pages, '2026-11-07T00:00:00Z');
+  insert('a', 4);
+  insert('b', 6);
+  assert.throws(() => insert('c', 7), /CHECK/u);
+});
